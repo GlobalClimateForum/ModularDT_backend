@@ -3,8 +3,12 @@ from django.http import HttpResponse
 from django.views import View
 from django.utils import timezone
 from django.http import JsonResponse
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 
-from .models import Event, Group
+import json
+
+from .models import Event, Group, Slide
 import datetime
 
 
@@ -46,3 +50,74 @@ class GroupView(View):
         group_name = request.POST.get("name")
         group = Group.objects.create(name=group_name)
         return HttpResponse(f"Group '{group_name}' created successfully.")
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SlideView(View):
+   
+    def get(self, request, *args, **kwargs):
+        slides = list(Slide.objects.values('id', 'name', 'content', 'updated_at', 'created_at'))
+        return JsonResponse(slides, safe=False)
+
+    def post(self, request, *args, **kwargs):
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+        name = data.get('name')
+        content = data.get('content', '')
+
+        if not name:
+            return JsonResponse({'error': 'Name is required'}, status=400)
+
+        slide = Slide(name=name, content=content)
+        try:
+            slide.full_clean()   # runs validate_single_slide + field checks
+            slide.save()
+        except ValidationError as e:
+            return JsonResponse({'error': e.message_dict}, status=400)
+
+        return JsonResponse(
+            {'id': slide.id, 'name': slide.name, 'content': slide.content},
+            status=201,
+        )
+
+@method_decorator(csrf_exempt, name='dispatch')    
+class SlideDetailView(View):
+            
+    def get(self, request, slide_id):
+        try:
+            slide = Slide.objects.get(id=slide_id)
+            return JsonResponse({'id': slide.id, 'name': slide.name, 'content': slide.content})
+        except Slide.DoesNotExist:
+            return JsonResponse({'error': 'Slide not found'}, status=404)
+        
+    def put(self, request, slide_id):
+        
+        try:
+            slide = Slide.objects.get(id=slide_id)
+        except Slide.DoesNotExist:
+            return JsonResponse({'error': 'Slide not found'}, status=404)
+        
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        
+        slide.name = data.get('name', slide.name)
+        slide.content = data.get('content', slide.content)
+        slide.updated_at = timezone.now()
+        try:
+            slide.full_clean()
+            slide.save()
+            return JsonResponse({'status': 'success'})
+        except ValidationError as e:
+            return JsonResponse({'error': e.message_dict}, status=400)
+        
+    def delete(self, request, slide_id):
+        try:
+            slide = Slide.objects.get(id=slide_id)
+            slide.delete()
+            return JsonResponse({'message': 'Slide deleted successfully'})
+        except Slide.DoesNotExist:
+            return JsonResponse({'error': 'Slide not found'}, status=404)
