@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from django.views import View
 from django.utils import timezone
+from django.http import JsonResponse
 
 from .models import Event, Group
 import datetime
@@ -38,7 +39,8 @@ class GroupView(View):
     def get(self, request):
         groups = Group.objects.all()
         group_list = [group.name for group in groups]
-        return HttpResponse(f"Groups: {', '.join(group_list)}")
+        groups_data = [{"id": group.id, "name": group.name} for group in groups]
+        return JsonResponse({"groups": groups_data})
 
     def post(self, request, *args, **kwargs):
         group_name = request.POST.get("name")
