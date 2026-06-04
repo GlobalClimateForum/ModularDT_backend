@@ -53,8 +53,8 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('order', models.PositiveIntegerField()),
-                ('event', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='app.event')),
-                ('scene', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='app.scene')),
+                ('event', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='core.event')),
+                ('scene', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='core.scene')),
             ],
             options={
                 'ordering': ['order'],
@@ -64,6 +64,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='event',
             name='scenes',
-            field=models.ManyToManyField(related_name='events', through='app.EventScene', to='app.scene'),
+            field=models.ManyToManyField(related_name='events', through='core.EventScene', to='core.scene'),
         ),
     ]
