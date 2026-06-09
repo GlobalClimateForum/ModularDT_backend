@@ -16,3 +16,4 @@ htmlcov/
 staticfiles/
 media/
 .DS_Store
+node_modules/
