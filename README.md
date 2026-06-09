@@ -8,4 +8,4 @@
 5. Create the database and migrate it by running `python manage.py migrate` - should create db.sqlite3 file
 
 # Run dev-Server
-1. `python manage.py runserver`
+1. `npm run dev` - will start marp-server (./marp-server) and backend server together
