@@ -4,7 +4,8 @@ from . import views
 
 urlpatterns = [
     path("", views.index, name="index"),
-    path("events/", views.EventView.as_view(), name="events"),
+    path("event/<int:event_id>/", views.EventDetailView.as_view(), name="event-detail"),
+    path("event/<int:event_id>/authorize/", views.EventAuthorize.as_view(), name="event-authorize"),
     path("groups/", views.GroupView.as_view(), name="groups"),
     path("slides/", views.SlideView.as_view(), name="slides"),
     path('slides/<int:slide_id>/', views.SlideDetailView.as_view(), name='slide-detail'),

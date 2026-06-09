@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.hashers import make_password, check_password
 
 class Format(models.Model):
     title = models.CharField(max_length=255)
@@ -17,6 +18,20 @@ class Event(models.Model):
     n_groups = models.IntegerField(default=3)
     n_monitor = models.IntegerField(default=1)
     scenes = models.ManyToManyField('Scene', through='EventScene', related_name='events')
+    moderator_pin = models.CharField(max_length=128,  blank = True, null = True) # hashed pin for moderator access
+    
+    def set_pin(self, raw_pin):
+        self.moderator_pin = make_password(raw_pin)
+        
+    def check_pin(self, raw_pin):
+        # If no pin is set, allow access
+        if not self.moderator_pin:
+            return True
+        return check_password(raw_pin, self.moderator_pin)
+    
+    def reset_pin(self): 
+        self.moderator_pin = None
+        self.save()
     
     def __str__(self): 
         return self.name

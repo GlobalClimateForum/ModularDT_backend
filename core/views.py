@@ -5,6 +5,7 @@ from django.utils import timezone
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
 import json
 
@@ -130,3 +131,39 @@ class SlideDetailView(View):
             return JsonResponse({'message': 'Slide deleted successfully', 'status': 'success'})
         except Slide.DoesNotExist:
             return JsonResponse({'error': 'Slide not found', 'status': 'error'}, status=404)
+
+class EventDetailView(View):
+    
+    # Get details of a specific event, including its associated scenes
+    def get(self, request, event_id):
+        try:
+            event = Event.objects.get(eventID=event_id)
+        except Event.DoesNotExist:
+            return JsonResponse({'error': 'Event not found'}, status=404)
+        return JsonResponse({
+            'id': event.eventID,
+            'name': event.name,
+            'description': event.description,
+            'date': event.date,
+            'n_groups': event.n_groups,
+            'n_monitor': event.n_monitor,
+            'scenes': list(event.scenes.values('id', 'title')),
+        })
+
+class EventAuthorize(View): 
+    
+    def post(self, request, event_id): 
+        
+        # Check if event exists
+        try:
+            event = Event.objects.get(eventID=event_id)
+        
+        except Event.DoesNotExist:
+            return JsonResponse({'error': 'Event not found'}, status=404)
+
+        # Get the pin from the request and check it against the event's moderator pin
+        pin = json.loads(request.body).get('pin', '')
+        if not event.moderator_pin:
+            return JsonResponse({'valid': True, 'message': 'No pin set'})
+        valid = event.check_pin(pin)
+        return JsonResponse({'valid': valid, 'message': 'Pin valid' if valid else 'Invalid pin'})
