@@ -90,34 +90,43 @@ class SlideDetailView(View):
             slide = Slide.objects.get(id=slide_id)
             return JsonResponse({'id': slide.id, 'name': slide.name, 'content': slide.content})
         except Slide.DoesNotExist:
-            return JsonResponse({'error': 'Slide not found'}, status=404)
+            return JsonResponse({'error': 'Slide not found', 'status': 'error'}, status=404)
+
+    def patch(self, request, slide_id):
+        return self._update(request, slide_id)
         
     def put(self, request, slide_id):
+        return self._update(request, slide_id)
+
+    def _update(self, request, slide_id):
         
         try:
             slide = Slide.objects.get(id=slide_id)
         except Slide.DoesNotExist:
-            return JsonResponse({'error': 'Slide not found'}, status=404)
+            return JsonResponse({'error': 'Slide not found', 'status': 'error'}, status=404)
         
         try:
             data = json.loads(request.body)
         except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+            return JsonResponse({'error': 'Invalid JSON', 'status': 'error'}, status=400)
         
         slide.name = data.get('name', slide.name)
         slide.content = data.get('content', slide.content)
         slide.updated_at = timezone.now()
+        
         try:
             slide.full_clean()
             slide.save()
-            return JsonResponse({'status': 'success'})
+            return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 'content': slide.content, 
+                                 'updated_at': slide.updated_at, 'created_at': slide.created_at})
+       
         except ValidationError as e:
-            return JsonResponse({'error': e.message_dict}, status=400)
+            return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
         
     def delete(self, request, slide_id):
         try:
             slide = Slide.objects.get(id=slide_id)
             slide.delete()
-            return JsonResponse({'message': 'Slide deleted successfully'})
+            return JsonResponse({'message': 'Slide deleted successfully', 'status': 'success'})
         except Slide.DoesNotExist:
-            return JsonResponse({'error': 'Slide not found'}, status=404)
+            return JsonResponse({'error': 'Slide not found', 'status': 'error'}, status=404)
