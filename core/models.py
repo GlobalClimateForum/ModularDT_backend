@@ -55,6 +55,7 @@ class Slide(models.Model):
     content = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    tags = models.TextField(blank=True)
 
     def __str__(self):
         return f"{self.name} (created at {self.created_at})"
