@@ -51,7 +51,6 @@ const SCALING_CSS = `
 
   section { 
   border: none !important; 
-  background: white !important; 
 }
 `;
 // Render endpoint 
