@@ -56,7 +56,12 @@ class GroupView(View):
 class SlideView(View):
    
     def get(self, request, *args, **kwargs):
-        slides = list(Slide.objects.values('id', 'name', 'content', 'updated_at', 'created_at'))
+        slides = list(Slide.objects.values('id', 'name', 'content', 'updated_at', 'created_at', 'tags'))
+        
+        for slide in slides:
+            tags = slide.pop('tags') or ''
+            slide['tags'] = [tag.strip() for tag in tags.split(',') if tag.strip()]
+        
         return JsonResponse(slides, safe=False)
 
     def post(self, request, *args, **kwargs):
@@ -79,7 +84,7 @@ class SlideView(View):
             return JsonResponse({'error': e.message_dict}, status=400)
 
         return JsonResponse(
-            {'id': slide.id, 'name': slide.name, 'content': slide.content},
+            {'id': slide.id, 'name': slide.name, 'content': slide.content, 'tags': slide.tag_list},
             status=201,
         )
 
@@ -89,7 +94,15 @@ class SlideDetailView(View):
     def get(self, request, slide_id):
         try:
             slide = Slide.objects.get(id=slide_id)
-            return JsonResponse({'id': slide.id, 'name': slide.name, 'content': slide.content})
+            response_data = {
+                'id': slide.id,
+                'name': slide.name,
+                'content': slide.content,
+                'created_at': slide.created_at,
+                'updated_at': slide.updated_at,
+                'tags': slide.tag_list,
+            }
+            return JsonResponse(response_data)
         except Slide.DoesNotExist:
             return JsonResponse({'error': 'Slide not found', 'status': 'error'}, status=404)
 
@@ -113,13 +126,14 @@ class SlideDetailView(View):
         
         slide.name = data.get('name', slide.name)
         slide.content = data.get('content', slide.content)
+        slide.tags = ', '.join(data.get('tags', slide.tag_list))
         slide.updated_at = timezone.now()
         
         try:
             slide.full_clean()
             slide.save()
             return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 'content': slide.content, 
-                                 'updated_at': slide.updated_at, 'created_at': slide.created_at})
+                                 'updated_at': slide.updated_at, 'created_at': slide.created_at, 'tags': slide.tag_list})
        
         except ValidationError as e:
             return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
