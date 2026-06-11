@@ -56,7 +56,7 @@ class GroupView(View):
 class SlideView(View):
    
     def get(self, request, *args, **kwargs):
-        slides = list(Slide.objects.values('id', 'name', 'content', 'updated_at', 'created_at', 'tags'))
+        slides = list(Slide.objects.values('id', 'name', 'markdown', 'updated_at', 'created_at', 'tags'))
         
         for slide in slides:
             tags = slide.pop('tags') or ''
@@ -71,12 +71,12 @@ class SlideView(View):
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
         name = data.get('name')
-        content = data.get('content', '')
+        markdown = data.get('markdown', '')
 
         if not name:
             return JsonResponse({'error': 'Name is required'}, status=400)
 
-        slide = Slide(name=name, content=content)
+        slide = Slide(name=name, markdown=markdown)
         try:
             slide.full_clean()   # runs validate_single_slide + field checks
             slide.save()
@@ -84,7 +84,7 @@ class SlideView(View):
             return JsonResponse({'error': e.message_dict}, status=400)
 
         return JsonResponse(
-            {'id': slide.id, 'name': slide.name, 'content': slide.content, 'tags': slide.tag_list},
+            {'id': slide.id, 'name': slide.name, 'markdown': slide.markdown, 'tags': slide.tag_list},
             status=201,
         )
 
@@ -97,7 +97,7 @@ class SlideDetailView(View):
             response_data = {
                 'id': slide.id,
                 'name': slide.name,
-                'content': slide.content,
+                'markdown': slide.markdown,
                 'created_at': slide.created_at,
                 'updated_at': slide.updated_at,
                 'tags': slide.tag_list,
@@ -125,14 +125,14 @@ class SlideDetailView(View):
             return JsonResponse({'error': 'Invalid JSON', 'status': 'error'}, status=400)
         
         slide.name = data.get('name', slide.name)
-        slide.content = data.get('content', slide.content)
+        slide.markdown = data.get('markdown', slide.markdown)
         slide.tags = ', '.join(data.get('tags', slide.tag_list))
         slide.updated_at = timezone.now()
         
         try:
             slide.full_clean()
             slide.save()
-            return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 'content': slide.content, 
+            return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 'markdown': slide.markdown, 
                                  'updated_at': slide.updated_at, 'created_at': slide.created_at, 'tags': slide.tag_list})
        
         except ValidationError as e:
