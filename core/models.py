@@ -51,14 +51,28 @@ class Group(models.Model):
 
 
 class Slide(models.Model):
+    
+    class Layout(models.TextChoices):
+        FULL = 'full', 'Full Screen'
+        LEFT = 'half-left', 'Half Left'
+        RIGHT = 'half-right', 'Half Right'
+    
     name = models.CharField(max_length=255)
     content = models.TextField(blank=True)
+    markdown = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    layout = models.CharField(max_length=20, choices=Layout.choices, default=Layout.FULL)
     tags = models.TextField(blank=True)
 
     def __str__(self):
         return f"{self.name} (created at {self.created_at})"
+    
+    @property
+    def tag_list(self): 
+        if not self.tags: 
+            return []
+        return [tag.strip() for tag in self.tags.split(',') if tag.strip()]
 
 class EventScene(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE)
