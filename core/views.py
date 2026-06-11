@@ -146,6 +146,45 @@ class SlideDetailView(View):
         except Slide.DoesNotExist:
             return JsonResponse({'error': 'Slide not found', 'status': 'error'}, status=404)
 
+@method_decorator(csrf_exempt, name='dispatch')        
+class SlideTagView(View): 
+    
+    def get(self, request, tag_name): 
+        slides = Slide.objects.filter(tags__icontains=tag_name)
+        
+        return JsonResponse([{
+            'id': slide.id,
+            'name': slide.name,
+            'markdown': slide.markdown,
+            'created_at': slide.created_at,
+            'updated_at': slide.updated_at,
+            'tags': slide.tag_list,
+        } for slide in slides], safe=False)
+        
+    def post(self, request, tag_name, slide_id):
+        try: 
+            slide = Slide.objects.get(id=slide_id)
+            tags = slide.tag_list
+            if tag_name not in tags:
+                tags.append(tag_name)
+                slide.tags = ', '.join(tags)
+            slide.save()
+            return JsonResponse({'message': 'Tag added successfully', 'status': 'success'})
+        except Slide.DoesNotExist:
+            return JsonResponse({'error': 'Slide not found', 'status': 'error'}, status=404)
+        
+    def delete(self, request, tag_name, slide_id):
+        try:
+            slide = Slide.objects.get(id=slide_id)
+            tags = slide.tag_list
+            if tag_name in tags:
+                tags.remove(tag_name)
+                slide.tags = ', '.join(tags)
+            slide.save()
+            return JsonResponse({'message': 'Tag removed successfully', 'status': 'success'})
+        except Slide.DoesNotExist:
+            return JsonResponse({'error': 'Slide not found', 'status': 'error'}, status=404)
+
 class EventDetailView(View):
     
     # Get details of a specific event, including its associated scenes
