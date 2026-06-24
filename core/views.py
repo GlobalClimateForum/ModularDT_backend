@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 
 import json
 
-from .models import Event, Group, Slide
+from .models import Event, Group, Slide, Scene
 import datetime
 
 
@@ -84,6 +84,28 @@ class GroupView(View):
         group_name = request.POST.get("name")
         group = Group.objects.create(name=group_name)
         return HttpResponse(f"Group '{group_name}' created successfully.")
+    
+@method_decorator(csrf_exempt, name='dispatch')
+class SceneView(View): 
+    
+    def get(self, request): 
+        scenes = Scene.objects.all()
+        scene_list = [{"id": scene.id, "name": scene.name, "slides": [slide.id for slide in scene.slides.all()]} for scene in scenes]
+        return JsonResponse({"scenes": scene_list})
+    
+    def post(self, request, *args, **kwargs):
+        try: 
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        
+        scene_name = data.get("name")
+        slide_ids = data.get("slides", [])
+        print(slide_ids)
+        scene = Scene.objects.create(name=scene_name)
+        print(Slide.objects.filter(id__in=slide_ids))
+        scene.slides.set(Slide.objects.filter(id__in=slide_ids))
+        return JsonResponse({"message": f"Scene '{scene_name}' created successfully.", "scene_id": scene.id})
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SlideView(View):

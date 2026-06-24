@@ -50,11 +50,12 @@ class Monitor(models.Model):
     
     
 class Scene(models.Model):
-    title = models.CharField(max_length=255)
+    name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+    slides = models.ManyToManyField('Slide', related_name='scenes', blank=True)
 
     def __str__(self):
-        return self.title
+        return self.name
     
 class Group(models.Model):
     name = models.CharField(max_length=255)
