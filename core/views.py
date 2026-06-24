@@ -29,17 +29,50 @@ class EventView(View):
         event_description = request.POST.get("description", "")
         event_date = request.POST.get("date") or timezone.now()
         n_groups = int(request.POST.get("n_groups", 3))
-        n_monitor = int(request.POST.get("n_monitor", 1))
 
         event = Event.objects.create(
             name=event_name,
             description=event_description,
             date=event_date,
             n_groups=n_groups,
-            n_monitor=n_monitor,
         )
         return HttpResponse(f"Event '{event_name}' created successfully.")
+    
+class MonitorView(View):
+    
+    def get(self, request, event_id):
+        try:
+            event = Event.objects.get(eventID=event_id)
+        except Event.DoesNotExist:
+            return JsonResponse({'error': 'Event not found'}, status=404)
+        
+        monitor_data = {
+            'event_id': event.eventID,
+            'event_name': event.name,
+            'monitors': list(event.monitors.values('id', 'name')),
+        }
+        return JsonResponse(monitor_data)
+    
+    def post(self, request, event_id):
+        try:
+            event = Event.objects.get(eventID=event_id)
+        except Event.DoesNotExist:
+            return JsonResponse({'error': 'Event not found'}, status=404)
 
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+        monitor_name = data.get('name')
+        aspect_ratio = data.get('aspect', '16:9')
+
+        if not monitor_name:
+            return JsonResponse({'error': 'Monitor name is required'}, status=400)
+
+        monitor = event.monitors.create(name=monitor_name, aspect=aspect_ratio)
+        return JsonResponse({'message': f'Monitor "{monitor_name}" added to event "{event.name}".', 'monitor_id': monitor.id})
+  
 class GroupView(View):
     def get(self, request):
         groups = Group.objects.all()
@@ -56,7 +89,7 @@ class GroupView(View):
 class SlideView(View):
    
     def get(self, request, *args, **kwargs):
-        slides = list(Slide.objects.values('id', 'name', 'markdown', 'updated_at', 'created_at', 'tags'))
+        slides = list(Slide.objects.values('id', 'name', 'markdown', 'updated_at', 'created_at', 'width', 'height', 'tags'))
         
         for slide in slides:
             tags = slide.pop('tags') or ''
@@ -101,6 +134,8 @@ class SlideDetailView(View):
                 'created_at': slide.created_at,
                 'updated_at': slide.updated_at,
                 'tags': slide.tag_list,
+                'width': slide.width,
+                'height': slide.height
             }
             return JsonResponse(response_data)
         except Slide.DoesNotExist:
