@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 
 import json
 
-from .models import Event, Group, Slide, Scene
+from .models import Event, Group, Slide, Scene, SlideSection
 import datetime
 
 
@@ -111,11 +111,13 @@ class SceneView(View):
 class SlideView(View):
    
     def get(self, request, *args, **kwargs):
-        slides = list(Slide.objects.values('id', 'name', 'markdown', 'updated_at', 'created_at', 'width', 'height', 'tags'))
+        slides = list(Slide.objects.values('id', 'name', 'updated_at', 'created_at', 'width', 'height', 'tags'))
         
         for slide in slides:
             tags = slide.pop('tags') or ''
             slide['tags'] = [tag.strip() for tag in tags.split(',') if tag.strip()]
+            sections = SlideSection.objects.filter(slide_id=slide['id']).values('id', 'view_type', 'content', 'content_path')
+            slide['sections'] = list(sections)
         
         return JsonResponse(slides, safe=False)
 
@@ -125,23 +127,7 @@ class SlideView(View):
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
-        name = data.get('name')
-        markdown = data.get('markdown', '')
-
-        if not name:
-            return JsonResponse({'error': 'Name is required'}, status=400)
-
-        slide = Slide(name=name, markdown=markdown)
-        try:
-            slide.full_clean()   # runs validate_single_slide + field checks
-            slide.save()
-        except ValidationError as e:
-            return JsonResponse({'error': e.message_dict}, status=400)
-
-        return JsonResponse(
-            {'id': slide.id, 'name': slide.name, 'markdown': slide.markdown, 'tags': slide.tag_list},
-            status=201,
-        )
+        print(data)
 
 @method_decorator(csrf_exempt, name='dispatch')    
 class SlideDetailView(View):
@@ -202,6 +188,50 @@ class SlideDetailView(View):
             return JsonResponse({'message': 'Slide deleted successfully', 'status': 'success'})
         except Slide.DoesNotExist:
             return JsonResponse({'error': 'Slide not found', 'status': 'error'}, status=404)
+        
+@method_decorator(csrf_exempt, name='dispatch')
+class SlideSectionView(View):
+    
+    def get(self, request, slide_id):
+        
+        try:
+            sections = SlideSection.objects.filter(slide_id=slide_id)
+            sections_data = [{
+                'id': section.id,
+                'slide_id': section.id,
+                'view_type': section.view_type,
+                'content': section.content,
+                'content_path': section.content_path
+            } for section in sections]
+            return JsonResponse(sections_data, safe=False)
+        
+        except SlideSection.DoesNotExist:
+            return JsonResponse({'error': 'Slide sections not found for the provided Slide ID', 'status': 'error'}, status=404)
+    
+    def post(self, request, slide_id): 
+        
+        try: 
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON', 'status': 'error'}, status=400)
+        
+        view_type = data.get('view_type')
+        content = data.get('content', '')
+        content_path = data.get('content_path', '')
+        slide = Slide.objects.get(id=slide_id)
+        
+        section = SlideSection.objects.create(
+            slide=slide,
+            view_type=view_type,
+            content=content,
+            content_path=content_path
+        )
+        
+        return JsonResponse({
+            'message': 'Slide section created successfully',
+            'status': 'success',
+            'section_id': section.id,
+        })  
 
 @method_decorator(csrf_exempt, name='dispatch')        
 class SlideTagView(View): 

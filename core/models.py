@@ -1,15 +1,6 @@
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
 
-class Format(models.Model):
-    title = models.CharField(max_length=255)
-    description = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return self.title
-    
 class Event(models.Model):
     eventID = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
@@ -17,7 +8,6 @@ class Event(models.Model):
     date = models.DateTimeField()
     n_groups = models.IntegerField(default=3)
     monitors = models.ManyToManyField('Monitor', related_name='events')
-    scenes = models.ManyToManyField('Scene', through='EventScene', related_name='events')
     moderator_pin = models.CharField(max_length=128,  blank = True, null = True) # hashed pin for moderator access
     
     def nmonitors(self) -> int: 
@@ -67,12 +57,12 @@ class Group(models.Model):
 class Slide(models.Model):
     
     class Layout(models.TextChoices):
-        FULL = 'full', 'Full Screen'
-        LEFT = 'half-left', 'Half Left'
-        RIGHT = 'half-right', 'Half Right'
-    
+        FULL = '100', 'Full Screen'
+        HALFS = '50', 'Half Screen'
+        TERTS = '33', 'Third Screen'
+        GOLDEN = '62', 'Golden Ratio'
+        
     name = models.CharField(max_length=255)
-    markdown = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     layout = models.CharField(max_length=20, choices=Layout.choices, default=Layout.FULL)
@@ -89,14 +79,15 @@ class Slide(models.Model):
             return []
         return [tag.strip() for tag in self.tags.split(',') if tag.strip()]
 
-class EventScene(models.Model):
-    event = models.ForeignKey(Event, on_delete=models.CASCADE)
-    scene = models.ForeignKey(Scene, on_delete=models.CASCADE)
-    order = models.PositiveIntegerField()
-
-    class Meta:
-        ordering = ["order"]
-        unique_together = ("event", "scene")
-
-    def __str__(self):
-        return f"{self.event} -> {self.scene} ({self.order})"
+class SlideSection(models.Model):
+    
+    class SectionType(models.TextChoices):
+        TEXT = 'text', 'Text'
+        IMAGE = 'image', 'Image'
+        VIDEO = 'video', 'Video'
+        CHART = 'chart', 'Chart'
+    
+    slide = models.ForeignKey(Slide, related_name='sections', on_delete=models.CASCADE)
+    view_type = models.CharField(max_length=20, choices=SectionType.choices, default=SectionType.TEXT)
+    content = models.TextField(blank=True)
+    content_path = models.CharField(max_length=255, blank=True)
