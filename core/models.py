@@ -53,19 +53,11 @@ class Group(models.Model):
     def __str__(self):
         return self.name
 
-
 class Slide(models.Model):
     
-    class Layout(models.TextChoices):
-        FULL = '100', 'Full Screen'
-        HALFS = '50', 'Half Screen'
-        TERTS = '33', 'Third Screen'
-        GOLDEN = '62', 'Golden Ratio'
-        
     name = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    layout = models.CharField(max_length=20, choices=Layout.choices, default=Layout.FULL)
     width = models.IntegerField(default=1920)
     height = models.IntegerField(default=1080)
     tags = models.TextField(blank=True)
