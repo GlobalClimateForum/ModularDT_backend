@@ -2,16 +2,15 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from django.views import View
 from django.utils import timezone
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 import json
 
-from .models import Event, Group, Slide, Scene, SlideSection
+from .models import Event, Group, Presentation, Slide, Scene, SlideSection
 import datetime
-
 
 def index(request):
     return HttpResponse("Hello, welcome to the Decision Theater backend server.")
@@ -307,3 +306,56 @@ class EventAuthorize(View):
             return JsonResponse({'valid': True, 'message': 'No pin set'})
         valid = event.check_pin(pin)
         return JsonResponse({'valid': valid, 'message': 'Pin valid' if valid else 'Invalid pin'})
+
+# DL: global state
+LAST_UPDATED = {}
+
+def get_presentation_data(presentation_name):
+    try:
+        pres = Presentation.objects.get(name=presentation_name)
+        scene = Scene.objects.get(presentation=pres, scene_number=pres.current_scene)
+        return {
+            "scene": pres.current_scene,
+            "content": scene.content
+        }
+    except (Presentation.DoesNotExist, Scene.DoesNotExist):
+        return {"scene": 1, "content": "Keine Inhalte gefunden."}
+
+@csrf_exempt
+def switch_scene(request, name):
+    """ Steuert vor und zurück via POST """
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        direction = data.get('direction') # "next" oder "prev"
+        
+        pres, _ = Presentation.objects.get_or_create(name=name)
+        max_slides = pres.slides.count()
+
+        if direction == 'next' and pres.current_scene < max_slides:
+            pres.current_scene += 1
+        elif direction == 'prev' and pres.current_scene > 1:
+            pres.current_scene -= 1
+        else:
+            pres.current_scene = 1  # Zurück zum ersten Scene
+
+        pres.save()
+        LAST_UPDATED[name] = time.time() # Signalisiert dem SSE-Stream ein Update
+        
+        return JsonResponse(get_slide_data(name))
+
+def presentation_stream(request, name):
+    """ SSE Endpoint: Hält Verbindung offen und sendet Daten bei Änderung """
+    def event_stream():
+        last_seen = None
+        while True:
+            # Prüfen, ob sich der Zustand geändert hat
+            current_update = LAST_UPDATED.get(name, 0)
+            if last_seen is None or current_update > last_seen:
+                last_seen = current_update
+                data = get_slide_data(name)
+                yield f"data: {json.dumps(data)}\n\n"
+            time.sleep(0.5) # Polling-Intervall im Server-Thread
+
+    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+    response['Cache-Control'] = 'no-cache'
+    return response
