@@ -111,19 +111,43 @@ class SceneView(View):
 class SlideView(View):
    
     def get(self, request, *args, **kwargs):
+        
         slides = list(Slide.objects.values('id', 'name', 'updated_at', 'created_at', 'width', 'height', 'tags'))
         
         for slide in slides:
             tags = slide.pop('tags') or ''
             slide['tags'] = [tag.strip() for tag in tags.split(',') if tag.strip()]
-            sections = SlideSection.objects.filter(slide_id=slide['id']).values('id', 'view_type', 'content', 'content_path')
+            sections = SlideSection.objects.filter(slide_id=slide['id']).values()
             slide['sections'] = list(sections)
         
         return JsonResponse(slides, safe=False)
 
     def post(self, request, *args, **kwargs):
         try:
+            
             data = json.loads(request.body)
+            sections = data.get('sections', [])
+            
+            # Create the slide
+            slide = Slide.objects.create(
+                name=data.get('name', 'Untitled Slide'),
+                width=data.get('width', 1920),
+                height=data.get('height', 1080),
+                tags=', '.join(data.get('tags', []))
+            )
+            
+            # Create sections for the slide
+            for section_data in sections:
+                SlideSection.objects.create(
+                    slide=slide,
+                    view_type=section_data.get('view_type'),
+                    content=section_data.get('content'),
+                    content_path=section_data.get('content_path'),
+                    width_fraction=section_data.get('width_fraction', 1.0)
+                )
+                
+            return JsonResponse({'message': f'Slide "{slide.name}" created successfully.', 'slide_id': slide.id})
+            
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
@@ -135,15 +159,16 @@ class SlideDetailView(View):
     def get(self, request, slide_id):
         try:
             slide = Slide.objects.get(id=slide_id)
+            sections = list(SlideSection.objects.filter(slide_id=slide['id']))
             response_data = {
                 'id': slide.id,
                 'name': slide.name,
-                'markdown': slide.markdown,
                 'created_at': slide.created_at,
                 'updated_at': slide.updated_at,
                 'tags': slide.tag_list,
                 'width': slide.width,
-                'height': slide.height
+                'height': slide.height,
+                'sections': [{'id': section.id, 'width_fraction': section.width_fraction, 'view_type': section.view_type, 'content': section.content, 'content_path': section.content_path} for section in sections]
             }
             return JsonResponse(response_data)
         except Slide.DoesNotExist:
@@ -201,7 +226,8 @@ class SlideSectionView(View):
                 'slide_id': section.id,
                 'view_type': section.view_type,
                 'content': section.content,
-                'content_path': section.content_path
+                'content_path': section.content_path, 
+                'width_fraction': section.width_fraction
             } for section in sections]
             return JsonResponse(sections_data, safe=False)
         
@@ -219,12 +245,14 @@ class SlideSectionView(View):
         content = data.get('content', '')
         content_path = data.get('content_path', '')
         slide = Slide.objects.get(id=slide_id)
+        width_fraction = data.get('width_fraction', 1.0)
         
         section = SlideSection.objects.create(
             slide=slide,
             view_type=view_type,
             content=content,
-            content_path=content_path
+            content_path=content_path,
+            width_fraction=width_fraction
         )
         
         return JsonResponse({

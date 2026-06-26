@@ -80,6 +80,7 @@ class SlideSection(models.Model):
         CHART = 'chart', 'Chart'
     
     slide = models.ForeignKey(Slide, related_name='sections', on_delete=models.CASCADE)
+    width_fraction = models.FloatField(default=1.0)
     view_type = models.CharField(max_length=20, choices=SectionType.choices, default=SectionType.TEXT)
     content = models.TextField(blank=True)
     content_path = models.CharField(max_length=255, blank=True)
