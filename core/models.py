@@ -39,6 +39,11 @@ class Monitor(models.Model):
     aspect = models.CharField(max_length=10, choices=AspectRatio.choices, default=AspectRatio.RATIO_16_9)
     
     
+class Presentation(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    current_scenes = models.IntegerField(default=1)
+    scenes = models.ManyToManyField('Scene', related_name='presentations', blank=True)
+
 class Scene(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
