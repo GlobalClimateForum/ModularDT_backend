@@ -14,5 +14,6 @@ urlpatterns = [
     path('tags/<str:tag_name>/', views.SlideTagView.as_view(), name='tag-slides'),
     path('tags/<str:tag_name>/slide/<int:slide_id>/', views.SlideTagView.as_view(), name='tag-remove'),
     path('monitor/<int:event_id>/', views.MonitorView.as_view(), name='monitor'),
-    path('scene/', views.SceneView.as_view(), name='scene')
+    path('scene/', views.SceneView.as_view(), name='scene'),    
+    path('settings/', views.SettingsView.as_view(), name='settings')
 ]

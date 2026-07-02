@@ -1,3 +1,5 @@
+from unittest import result
+
 from django.shortcuts import render
 from django.http import HttpResponse
 from django.views import View
@@ -9,7 +11,11 @@ from django.views.decorators.http import require_POST
 
 import json
 
-from .models import Event, Group, Presentation, Slide, Scene, SlideSection
+from dtbackend import settings
+
+from dtbackend import settings
+
+from .models import Event, Group, Presentation, Slide, Scene, SlideSection, Settings
 import datetime
 
 def index(request):
@@ -335,55 +341,45 @@ class EventAuthorize(View):
         valid = event.check_pin(pin)
         return JsonResponse({'valid': valid, 'message': 'Pin valid' if valid else 'Invalid pin'})
 
-# DL: global state
-LAST_UPDATED = {}
 
-def get_presentation_data(presentation_name):
-    try:
-        pres = Presentation.objects.get(name=presentation_name)
-        scene = Scene.objects.get(presentation=pres, scene_number=pres.current_scene)
-        return {
-            "scene": pres.current_scene,
-            "content": scene.content
-        }
-    except (Presentation.DoesNotExist, Scene.DoesNotExist):
-        return {"scene": 1, "content": "Keine Inhalte gefunden."}
 
-@csrf_exempt
-def switch_scene(request, name):
-    """ Steuert vor und zurück via POST """
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        direction = data.get('direction') # "next" oder "prev"
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SettingsView(View):
+   
+    def get(self, request, *args, **kwargs):
+        settings = list(Settings.objects.all())       
+        setting_item = [settings[0]] if settings else []
+        return JsonResponse(setting_item, safe=False)
         
-        pres, _ = Presentation.objects.get_or_create(name=name)
-        max_slides = pres.slides.count()
+    def patch(self, request):
+        return self._update(request)
+        
+    def _update(self, request):
+        settings = list(Settings.objects.all())       
+        setting_item = [settings[0]] if settings else []
+        print(setting_item) 
 
-        if direction == 'next' and pres.current_scene < max_slides:
-            pres.current_scene += 1
-        elif direction == 'prev' and pres.current_scene > 1:
-            pres.current_scene -= 1
+        if setting_item:
+            try:
+                data = json.loads(request.body)
+                setting_item.cs_url = data.get('cs_url', setting_item.cs_url)
+                setting_item.number_of_screens = data.get('number_of_screens', setting_item.number_of_screens)
+                setting_item.background_image = data.get('background_image', setting_item.background_image)
+                setting_item.language = data.get('language', setting_item.language)
+                setting_item.save()
+            except json.JSONDecodeError:
+                return JsonResponse({'error': 'Invalid JSON'}, status=400)
         else:
-            pres.current_scene = 1  # Zurück zum ersten Scene
+            try:
+                data = json.loads(request.body)
+            except json.JSONDecodeError:
+                return JsonResponse({'error': 'Invalid JSON'}, status=400)
+            settings = Settings.objects.create(
+                cs_url = data.get('cs_url', 'http://default-content-server.com'),
+                number_of_screens = data.get('number_of_screens', 4),
+                background_image = data.get('background_image', ''),
+                language = data.get('language', 'en')
+            )
+            return JsonResponse({'message': f'Settings created successfully.', 'settings_id': settings.id})
 
-        pres.save()
-        LAST_UPDATED[name] = time.time() # Signalisiert dem SSE-Stream ein Update
-        
-        return JsonResponse(get_slide_data(name))
-
-def presentation_stream(request, name):
-    """ SSE Endpoint: Hält Verbindung offen und sendet Daten bei Änderung """
-    def event_stream():
-        last_seen = None
-        while True:
-            # Prüfen, ob sich der Zustand geändert hat
-            current_update = LAST_UPDATED.get(name, 0)
-            if last_seen is None or current_update > last_seen:
-                last_seen = current_update
-                data = get_slide_data(name)
-                yield f"data: {json.dumps(data)}\n\n"
-            time.sleep(0.5) # Polling-Intervall im Server-Thread
-
-    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
-    response['Cache-Control'] = 'no-cache'
-    return response

@@ -90,3 +90,10 @@ class SlideSection(models.Model):
     content = models.TextField(blank=True)
     content_path = models.CharField(max_length=255, blank=True)
     mode = models.CharField(max_length=40, blank=True)
+
+class Settings(models.Model):
+    cs_url = models.CharField(max_length=255)
+    number_of_screens = models.IntegerField(default=4)
+    background_image = models.CharField(max_length=255)
+    language = models.CharField(max_length=255)
+
