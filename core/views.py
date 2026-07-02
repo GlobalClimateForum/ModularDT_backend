@@ -8,6 +8,7 @@ from django.http import JsonResponse, StreamingHttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from django.forms.models import model_to_dict
 
 import json
 
@@ -349,25 +350,33 @@ class SettingsView(View):
    
     def get(self, request, *args, **kwargs):
         settings = list(Settings.objects.all())       
-        setting_item = [settings[0]] if settings else []
-        return JsonResponse(setting_item, safe=False)
-        
+        settings_list= [settings[0]] if settings else []
+        return JsonResponse({
+            'message': 'Settings read successfully.', 
+            'settings': model_to_dict(settings_list[0]) if settings_list else None
+        })
+
     def patch(self, request):
         return self._update(request)
         
     def _update(self, request):
         settings = list(Settings.objects.all())       
-        setting_item = [settings[0]] if settings else []
-        print(setting_item) 
+        settings_list = [settings[0]] if settings else []
+        print(settings_list) 
 
-        if setting_item:
+        if settings_list:
             try:
                 data = json.loads(request.body)
+                setting_item = settings_list[0]
                 setting_item.cs_url = data.get('cs_url', setting_item.cs_url)
                 setting_item.number_of_screens = data.get('number_of_screens', setting_item.number_of_screens)
                 setting_item.background_image = data.get('background_image', setting_item.background_image)
                 setting_item.language = data.get('language', setting_item.language)
                 setting_item.save()
+                return JsonResponse({
+                    'message': 'Settings updated successfully.', 
+                    'settings': model_to_dict(setting_item)
+                })
             except json.JSONDecodeError:
                 return JsonResponse({'error': 'Invalid JSON'}, status=400)
         else:
@@ -375,11 +384,14 @@ class SettingsView(View):
                 data = json.loads(request.body)
             except json.JSONDecodeError:
                 return JsonResponse({'error': 'Invalid JSON'}, status=400)
-            settings = Settings.objects.create(
+            new_settings = Settings.objects.create(
                 cs_url = data.get('cs_url', 'http://default-content-server.com'),
                 number_of_screens = data.get('number_of_screens', 4),
                 background_image = data.get('background_image', ''),
                 language = data.get('language', 'en')
             )
-            return JsonResponse({'message': f'Settings created successfully.', 'settings_id': settings.id})
+            return JsonResponse({
+                'message': 'Settings created successfully.', 
+                'settings': model_to_dict(new_settings)
+            })
 

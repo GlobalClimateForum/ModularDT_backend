@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0015_presentation'),
+        ('core', '0016_presentation'),
         ('core', '0016_slidesection_width_fraction'),
     ]
 
