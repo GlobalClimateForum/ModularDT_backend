@@ -89,3 +89,4 @@ class SlideSection(models.Model):
     view_type = models.CharField(max_length=20, choices=SectionType.choices, default=SectionType.TEXT)
     content = models.TextField(blank=True)
     content_path = models.CharField(max_length=255, blank=True)
+    mode = models.CharField(max_length=40, blank=True)
