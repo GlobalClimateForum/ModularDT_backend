@@ -48,9 +48,18 @@ class Scene(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     slides = models.ManyToManyField('Slide', related_name='scenes', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    tags = models.TextField(blank=True)
 
     def __str__(self):
         return self.name
+    
+    @property
+    def tag_list(self): 
+        if not self.tags: 
+            return []
+        return [tag.strip() for tag in self.tags.split(',') if tag.strip()]
     
 class Group(models.Model):
     name = models.CharField(max_length=255)

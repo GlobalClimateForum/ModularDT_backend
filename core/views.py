@@ -94,24 +94,141 @@ class GroupView(View):
 @method_decorator(csrf_exempt, name='dispatch')
 class SceneView(View): 
     
-    def get(self, request): 
-        scenes = Scene.objects.all()
-        scene_list = [{"id": scene.id, "name": scene.name, "slides": [slide.id for slide in scene.slides.all()]} for scene in scenes]
-        return JsonResponse({"scenes": scene_list})
+    def get(self, request):
+        # 1. Query optimieren mit prefetch_related für die Slides
+        scenes = Scene.objects.all().prefetch_related('slides')
     
+        scene_list = []
+        for scene in scenes:
+            raw_tags = scene.tags or ''
+            tag_list = [t.strip() for t in raw_tags.split(',') if t.strip()]
+        
+            scene_list.append({
+                "id": scene.id,
+                "name": scene.name,
+                "description": scene.description,
+                "updated_at": scene.updated_at,
+                "created_at": scene.created_at,
+                "tags": tag_list,
+                "slides": [slide.id for slide in scene.slides.all()]
+            })
+
+        return JsonResponse({"scenes": scene_list})
+
     def post(self, request, *args, **kwargs):
         try: 
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
         
-        scene_name = data.get("name")
         slide_ids = data.get("slides", [])
-        print(slide_ids)
-        scene = Scene.objects.create(name=scene_name)
-        print(Slide.objects.filter(id__in=slide_ids))
+        scene = Scene.objects.create(
+            name=data.get('name', 'Untitled Scene'),
+            description=data.get('description', ''),
+            tags=', '.join(data.get('tags', []))
+        )
+
         scene.slides.set(Slide.objects.filter(id__in=slide_ids))
-        return JsonResponse({"message": f"Scene '{scene_name}' created successfully.", "scene_id": scene.id})
+        return JsonResponse({"message": f"Scene '{scene.name}' created successfully.", "scene_id": scene.id})
+
+
+@method_decorator(csrf_exempt, name='dispatch')    
+class SceneDetailView(View):
+            
+    def get(self, request, scene_id):
+        try:
+            scene = Scene.objects.get(id=scene_id).prefetch_related('slides')
+            #sections = list(SlideSection.objects.filter(scene_id=scene['id']))
+            response_data = {
+                'id': scene.id,
+                'name': scene.name,
+                'created_at': scene.created_at,
+                'updated_at': scene.updated_at,
+                'tags': scene.tag_list,
+                'slides': [slide.id for slide in scene.slides.all()]
+            }
+            return JsonResponse(response_data)
+        except Scene.DoesNotExist:
+            return JsonResponse({'error': 'Scene not found', 'status': 'error'}, status=404)
+
+    def patch(self, request, scene_id):
+        return self._update(request, scene_id)
+        
+    def put(self, request, scene_id):
+        return self._update(request, scene_id)
+
+    def _update(self, request, scene_id):
+        
+        try:
+            scene = Scene.objects.get(id=scene_id)
+        except Scene.DoesNotExist:
+            return JsonResponse({'error': 'Scene not found', 'status': 'error'}, status=404)
+        
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON', 'status': 'error'}, status=400)
+        
+        scene.name = data.get('name', scene.name)
+        scene.tags = ', '.join(data.get('tags', scene.tag_list))
+        scene.updated_at = timezone.now()
+        slide_ids = data.get("slides", scene.slides.values_list('id', flat=True))
+        scene.slides.set(Slide.objects.filter(id__in=slide_ids))
+
+        try:
+            scene.full_clean()
+            scene.save()
+            return JsonResponse({'status': 'success', 'id': scene.id, 'name': scene.name, 'updated_at': scene.updated_at, 'created_at': scene.created_at, 'tags': scene.tags})
+       
+        except ValidationError as e:
+            return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
+        
+    def delete(self, request, scene_id):
+        try:
+            scene = Scene.objects.get(id=scene_id)
+            scene.delete()
+            return JsonResponse({'message': 'Scene deleted successfully', 'status': 'success'})
+        except Scene.DoesNotExist:
+            return JsonResponse({'error': 'Scene not found', 'status': 'error'}, status=404)
+
+@method_decorator(csrf_exempt, name='dispatch')        
+class SceneTagView(View): 
+    
+    def get(self, request, tag_name): 
+        scenes = Scene.objects.filter(tags__icontains=tag_name)
+        
+        return JsonResponse([{
+            'id': scene.id,
+            'name': scene.name,
+            'created_at': scene.created_at,
+            'updated_at': scene.updated_at,
+            'tags': scene.tag_list,
+        } for scene in scenes], safe=False)
+        
+    def post(self, request, tag_name, scene_id):
+        try: 
+            scene = Scene.objects.get(id=scene_id)
+            tags = scene.tag_list
+            if tag_name not in tags:
+                tags.append(tag_name)
+                scene.tags = ', '.join(tags)
+            scene.save()
+            return JsonResponse({'message': 'Tag added successfully', 'status': 'success'})
+        except Scene.DoesNotExist:
+            return JsonResponse({'error': 'Scene not found', 'status': 'error'}, status=404)
+        
+    def delete(self, request, tag_name, scene_id):
+        try:
+            scene = Scene.objects.get(id=scene_id)
+            tags = scene.tag_list
+            if tag_name in tags:
+                tags.remove(tag_name)
+                scene.tags = ', '.join(tags)
+            scene.save()
+            return JsonResponse({'message': 'Tag removed successfully', 'status': 'success'})
+        except Scene.DoesNotExist:
+            return JsonResponse({'error': 'Scene not found', 'status': 'error'}, status=404)
+
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SlideView(View):
@@ -207,7 +324,7 @@ class SlideDetailView(View):
             slide.full_clean()
             slide.save()
             return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 'markdown': slide.markdown, 
-                                 'updated_at': slide.updated_at, 'created_at': slide.created_at, 'tags': slide.tag_list})
+                                 'updated_at': slide.updated_at, 'created_at': slide.created_at, 'tags': slide.tags})
        
         except ValidationError as e:
             return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
@@ -276,7 +393,6 @@ class SlideTagView(View):
         return JsonResponse([{
             'id': slide.id,
             'name': slide.name,
-            'markdown': slide.markdown,
             'created_at': slide.created_at,
             'updated_at': slide.updated_at,
             'tags': slide.tag_list,
