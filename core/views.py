@@ -9,14 +9,13 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.forms.models import model_to_dict
+from django.db.models import Prefetch
 
 import json
 
 from dtbackend import settings
 
-from dtbackend import settings
-
-from .models import Event, Group, Presentation, Slide, Scene, SlideSection, Settings
+from .models import Event, Group, Presentation, Slide, Scene, SlideSection, Settings, SlideInScenePosition 
 import datetime
 
 def index(request):
@@ -95,14 +94,40 @@ class GroupView(View):
 class SceneView(View): 
     
     def get(self, request):
-        # 1. Query optimieren mit prefetch_related für die Slides
-        scenes = Scene.objects.all().prefetch_related('slides')
-    
+        # Wir prefetchen die Zwischentabelle (sortiert nach Position) 
+        # und holen direkt die A-Objekte samt ihren Sections mit.
+        prefetch_through = Prefetch(
+            'slideinsceneposition_set',  # Django-Standardname für die Rückbeziehung der Zwischentabelle
+            queryset=SlideInScenePosition.objects.select_related('slide').prefetch_related('slide__sections')
+        )
+        
+        scenes = Scene.objects.prefetch_related(prefetch_through).all()
+
         scene_list = []
         for scene in scenes:
+            # Tags splitten wie bisher
             raw_tags = scene.tags or ''
             tag_list = [t.strip() for t in raw_tags.split(',') if t.strip()]
         
+            slide_list = []
+            for line in scene.slideinsceneposition_set.all():
+                slide = line.slide  # Das eigentliche A-Objekt
+            
+                # Sections vom verknüpften A-Objekt holen
+                section_list = list(slide.sections.all().values())
+            
+                slide_list.append({
+                    "id": slide.id,
+                    "name": slide.name,
+                    "created_at": slide.created_at,
+                    "updated_at": slide.updated_at,
+                    "width": slide.width,
+                    "height": slide.height,
+                    "tags": slide.tag_list,  
+                    "sections": section_list,
+                    "position": line.position 
+                })
+
             scene_list.append({
                 "id": scene.id,
                 "name": scene.name,
@@ -110,10 +135,11 @@ class SceneView(View):
                 "updated_at": scene.updated_at,
                 "created_at": scene.created_at,
                 "tags": tag_list,
-                "slides": [slide.id for slide in scene.slides.all()]
+                "slides": slide_list  
             })
 
-        return JsonResponse({"scenes": scene_list})
+        return JsonResponse({"scenes": scene_list}, safe=False)
+
 
     def post(self, request, *args, **kwargs):
         try: 
@@ -121,14 +147,32 @@ class SceneView(View):
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
         
-        slide_ids = data.get("slides", [])
+        # expected JSON-Format for "as" im POST-Request:
+        # "as": [{"id": 1, "position": 1}, {"id": 2, "position": 3}, {"id": 2, "position": 4}]
+        slide_data_list = data.get("as", [])
+        
         scene = Scene.objects.create(
             name=data.get('name', 'Untitled Scene'),
             description=data.get('description', ''),
             tags=', '.join(data.get('tags', []))
         )
 
-        scene.slides.set(Slide.objects.filter(id__in=slide_ids))
+        for item in slide_data_list:
+            slide_id = item.get("id")
+            position = item.get("position")
+            
+            if slide_id is not None and position is not None:
+                try:
+                    slide = Slide.objects.get(id=slide_id)
+                    SlideInScenePosition.objects.create(
+                        scene=scene, 
+                        slide=slide, 
+                        position=position
+                    )
+                except Slide.DoesNotExist:
+                    # Exception?
+                    pass
+
         return JsonResponse({"message": f"Scene '{scene.name}' created successfully.", "scene_id": scene.id})
 
 
@@ -145,8 +189,9 @@ class SceneDetailView(View):
                 'created_at': scene.created_at,
                 'updated_at': scene.updated_at,
                 'tags': scene.tag_list,
-                'slides': [slide.id for slide in scene.slides.all()]
+                'slides': list(scene.slides.all())
             }
+
             return JsonResponse(response_data)
         except Scene.DoesNotExist:
             return JsonResponse({'error': 'Scene not found', 'status': 'error'}, status=404)
@@ -234,16 +279,36 @@ class SceneTagView(View):
 class SlideView(View):
    
     def get(self, request, *args, **kwargs):
+        # old code: very unperfoment (N+1 queries if N slides)
+        #slides = list(Slide.objects.values('id', 'name', 'updated_at', 'created_at', 'width', 'height', 'tags'))
+        #for slide in slides:
+        #    tags = slide.pop('tags') or ''
+        #    slide['tags'] = [tag.strip() for tag in tags.split(',') if tag.strip()]
+        #    sections = SlideSection.objects.filter(slide_id=slide['id']).values()
+        #    slide['sections'] = list(sections)
         
-        slides = list(Slide.objects.values('id', 'name', 'updated_at', 'created_at', 'width', 'height', 'tags'))
+        #return JsonResponse(slides, safe=False)
+    
+        #Only 2 queries, independent of the number of slides, because of prefetch_related
+        slides_queryset = Slide.objects.prefetch_related('sections').all()
+    
+        result = []
+        for slide in slides_queryset:
+            # Greift auf die bereits im Cache liegenden Sektionen zu
+            sections_data = list(slide.sections.all().values())
         
-        for slide in slides:
-            tags = slide.pop('tags') or ''
-            slide['tags'] = [tag.strip() for tag in tags.split(',') if tag.strip()]
-            sections = SlideSection.objects.filter(slide_id=slide['id']).values()
-            slide['sections'] = list(sections)
+            result.append({
+                'id': slide.id,
+                'name': slide.name,
+                'updated_at': slide.updated_at,
+                'created_at': slide.created_at,
+                'width': slide.width,
+                'height': slide.height,
+                'tags': slide.tag_list,  # Nutzt dein vorhandenes Property!
+                'sections': sections_data
+            })
         
-        return JsonResponse(slides, safe=False)
+        return JsonResponse(result, safe=False)
 
     def post(self, request, *args, **kwargs):
         try:
