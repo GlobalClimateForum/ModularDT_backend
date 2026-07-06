@@ -1,6 +1,93 @@
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
 
+    
+class Presentation(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True)
+    scenes = models.ManyToManyField('Scene', through='SceneInPresentationPosition', related_name='presentations', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class Scene(models.Model):
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    slides = models.ManyToManyField('Slide', through='SlideInScenePosition', related_name='scenes', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    tags = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+    
+    @property
+    def tag_list(self): 
+        if not self.tags: 
+            return []
+        return [tag.strip() for tag in self.tags.split(',') if tag.strip()]
+    
+class SceneInPresentationPosition(models.Model):
+    scene = models.ForeignKey(Scene, on_delete=models.CASCADE)
+    presentation = models.ForeignKey(Presentation, on_delete=models.CASCADE)
+    position = models.PositiveIntegerField()  
+
+    class Meta:
+        ordering = ['position']
+
+    def __str__(self):
+        return f"{self.presentation.name} -> {self.scene.name} on Position {self.position}"
+
+class Slide(models.Model):
+    
+    name = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    width = models.IntegerField(default=1920)
+    height = models.IntegerField(default=1080)
+    tags = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.name} (created at {self.created_at})"
+    
+    @property
+    def tag_list(self): 
+        if not self.tags: 
+            return []
+        return [tag.strip() for tag in self.tags.split(',') if tag.strip()]
+
+class SlideSection(models.Model):
+    
+    class SectionType(models.TextChoices):
+        TEXT = 'text', 'Text'
+        IMAGE = 'image', 'Image'
+        VIDEO = 'video', 'Video'
+        CHART = 'chart', 'Chart'
+    
+    slide = models.ForeignKey(Slide, related_name='sections', on_delete=models.CASCADE)
+    width_fraction = models.FloatField(default=1.0)
+    view_type = models.CharField(max_length=20, choices=SectionType.choices, default=SectionType.TEXT)
+    content = models.TextField(blank=True)
+    content_path = models.CharField(max_length=255, blank=True)
+    mode = models.CharField(max_length=40, blank=True)
+
+class SlideInScenePosition(models.Model):
+    slide = models.ForeignKey(Slide, on_delete=models.CASCADE)
+    scene = models.ForeignKey(Scene, on_delete=models.CASCADE)
+    position = models.PositiveIntegerField()  
+
+    class Meta:
+        ordering = ['position']
+
+    def __str__(self):
+        return f"{self.scene.name} -> {self.slide.name} on Position {self.position}"
+
+class Settings(models.Model):
+    cs_url = models.CharField(max_length=255)
+    number_of_screens = models.IntegerField(default=4)
+    background_image = models.CharField(max_length=255)
+    language = models.CharField(max_length=255)
+
 class Event(models.Model):
     eventID = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
@@ -38,82 +125,8 @@ class Monitor(models.Model):
     name = models.CharField(max_length=255)
     aspect = models.CharField(max_length=10, choices=AspectRatio.choices, default=AspectRatio.RATIO_16_9)
     
-    
-class Presentation(models.Model):
-    name = models.CharField(max_length=255, unique=True)
-    current_scenes = models.IntegerField(default=1)
-    scenes = models.ManyToManyField('Scene', related_name='presentations', blank=True)
-
-class Scene(models.Model):
-    name = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
-    slides = models.ManyToManyField('Slide', through='SlideInScenePosition', related_name='scenes', blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    tags = models.TextField(blank=True)
-
-    def __str__(self):
-        return self.name
-    
-    @property
-    def tag_list(self): 
-        if not self.tags: 
-            return []
-        return [tag.strip() for tag in self.tags.split(',') if tag.strip()]
-    
 class Group(models.Model):
     name = models.CharField(max_length=255)
 
     def __str__(self):
         return self.name
-
-class Slide(models.Model):
-    
-    name = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    width = models.IntegerField(default=1920)
-    height = models.IntegerField(default=1080)
-    tags = models.TextField(blank=True)
-
-    def __str__(self):
-        return f"{self.name} (created at {self.created_at})"
-    
-    @property
-    def tag_list(self): 
-        if not self.tags: 
-            return []
-        return [tag.strip() for tag in self.tags.split(',') if tag.strip()]
-
-class SlideSection(models.Model):
-    
-    class SectionType(models.TextChoices):
-        TEXT = 'text', 'Text'
-        IMAGE = 'image', 'Image'
-        VIDEO = 'video', 'Video'
-        CHART = 'chart', 'Chart'
-    
-    slide = models.ForeignKey(Slide, related_name='sections', on_delete=models.CASCADE)
-    width_fraction = models.FloatField(default=1.0)
-    view_type = models.CharField(max_length=20, choices=SectionType.choices, default=SectionType.TEXT)
-    content = models.TextField(blank=True)
-    content_path = models.CharField(max_length=255, blank=True)
-    mode = models.CharField(max_length=40, blank=True)
-
-class SlideInScenePosition(models.Model):
-    scene = models.ForeignKey(Scene, on_delete=models.CASCADE)
-    slide = models.ForeignKey(Slide, on_delete=models.CASCADE)
-    position = models.PositiveIntegerField()  
-
-    class Meta:
-        ordering = ['position']
-
-    def __str__(self):
-        return f"{self.scene.name} -> {self.slide.name} on Position {self.position}"
-
-class Settings(models.Model):
-    cs_url = models.CharField(max_length=255)
-    number_of_screens = models.IntegerField(default=4)
-    background_image = models.CharField(max_length=255)
-    language = models.CharField(max_length=255)
-
