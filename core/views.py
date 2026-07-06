@@ -142,7 +142,8 @@ class SlideView(View):
                     view_type=section_data.get('view_type'),
                     content=section_data.get('content'),
                     content_path=section_data.get('content_path'),
-                    width_fraction=section_data.get('width_fraction', 1.0)
+                    width_fraction=section_data.get('width_fraction', 1.0),
+                    mode=section_data.get('mode', '')
                 )
                 
             return JsonResponse({'message': f'Slide "{slide.name}" created successfully.', 'slide_id': slide.id})
