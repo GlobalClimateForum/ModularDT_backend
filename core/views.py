@@ -1,3 +1,5 @@
+from unittest import result
+
 from django.shortcuts import render
 from django.http import HttpResponse
 from django.views import View
@@ -6,10 +8,14 @@ from django.http import JsonResponse, StreamingHttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from django.forms.models import model_to_dict
+from django.db.models import Prefetch
 
 import json
 
-from .models import Event, Group, Presentation, Slide, Scene, SlideSection
+from dtbackend import settings
+
+from .models import Event, Group, Presentation, Slide, Scene, SlideSection, Settings, SlideInScenePosition 
 import datetime
 
 def index(request):
@@ -87,39 +93,222 @@ class GroupView(View):
 @method_decorator(csrf_exempt, name='dispatch')
 class SceneView(View): 
     
-    def get(self, request): 
-        scenes = Scene.objects.all()
-        scene_list = [{"id": scene.id, "name": scene.name, "slides": [slide.id for slide in scene.slides.all()]} for scene in scenes]
-        return JsonResponse({"scenes": scene_list})
-    
+    def get(self, request):
+        # Wir prefetchen die Zwischentabelle (sortiert nach Position) 
+        # und holen direkt die A-Objekte samt ihren Sections mit.
+        prefetch_through = Prefetch(
+            'slideinsceneposition_set',  # Django-Standardname für die Rückbeziehung der Zwischentabelle
+            queryset=SlideInScenePosition.objects.select_related('slide').prefetch_related('slide__sections')
+        )
+        
+        scenes = Scene.objects.prefetch_related(prefetch_through).all()
+
+        scene_list = []
+        for scene in scenes:
+            # Tags splitten wie bisher
+            raw_tags = scene.tags or ''
+            tag_list = [t.strip() for t in raw_tags.split(',') if t.strip()]
+        
+            slide_list = []
+            for line in scene.slideinsceneposition_set.all():
+                slide = line.slide  # Das eigentliche A-Objekt
+            
+                # Sections vom verknüpften A-Objekt holen
+                section_list = list(slide.sections.all().values())
+            
+                slide_list.append({
+                    "id": slide.id,
+                    "name": slide.name,
+                    "created_at": slide.created_at,
+                    "updated_at": slide.updated_at,
+                    "width": slide.width,
+                    "height": slide.height,
+                    "tags": slide.tag_list,  
+                    "sections": section_list,
+                    "position": line.position 
+                })
+
+            scene_list.append({
+                "id": scene.id,
+                "name": scene.name,
+                "description": scene.description,
+                "updated_at": scene.updated_at,
+                "created_at": scene.created_at,
+                "tags": tag_list,
+                "slides": slide_list  
+            })
+
+        return JsonResponse({"scenes": scene_list}, safe=False)
+
+
     def post(self, request, *args, **kwargs):
         try: 
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
         
-        scene_name = data.get("name")
-        slide_ids = data.get("slides", [])
-        print(slide_ids)
-        scene = Scene.objects.create(name=scene_name)
-        print(Slide.objects.filter(id__in=slide_ids))
+        # expected JSON-Format for "as" im POST-Request:
+        # "as": [{"id": 1, "position": 1}, {"id": 2, "position": 3}, {"id": 2, "position": 4}]
+        slide_data_list = data.get("as", [])
+        
+        scene = Scene.objects.create(
+            name=data.get('name', 'Untitled Scene'),
+            description=data.get('description', ''),
+            tags=', '.join(data.get('tags', []))
+        )
+
+        for item in slide_data_list:
+            slide_id = item.get("id")
+            position = item.get("position")
+            
+            if slide_id is not None and position is not None:
+                try:
+                    slide = Slide.objects.get(id=slide_id)
+                    SlideInScenePosition.objects.create(
+                        scene=scene, 
+                        slide=slide, 
+                        position=position
+                    )
+                except Slide.DoesNotExist:
+                    # Exception?
+                    pass
+
+        return JsonResponse({"message": f"Scene '{scene.name}' created successfully.", "scene_id": scene.id})
+
+
+@method_decorator(csrf_exempt, name='dispatch')    
+class SceneDetailView(View):
+            
+    def get(self, request, scene_id):
+        try:
+            scene = Scene.objects.get(id=scene_id).prefetch_related('slides')
+            #sections = list(SlideSection.objects.filter(scene_id=scene['id']))
+            response_data = {
+                'id': scene.id,
+                'name': scene.name,
+                'created_at': scene.created_at,
+                'updated_at': scene.updated_at,
+                'tags': scene.tag_list,
+                'slides': list(scene.slides.all())
+            }
+
+            return JsonResponse(response_data)
+        except Scene.DoesNotExist:
+            return JsonResponse({'error': 'Scene not found', 'status': 'error'}, status=404)
+
+    def patch(self, request, scene_id):
+        return self._update(request, scene_id)
+        
+    def put(self, request, scene_id):
+        return self._update(request, scene_id)
+
+    def _update(self, request, scene_id):
+        
+        try:
+            scene = Scene.objects.get(id=scene_id)
+        except Scene.DoesNotExist:
+            return JsonResponse({'error': 'Scene not found', 'status': 'error'}, status=404)
+        
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON', 'status': 'error'}, status=400)
+        
+        scene.name = data.get('name', scene.name)
+        scene.tags = ', '.join(data.get('tags', scene.tag_list))
+        scene.updated_at = timezone.now()
+        slide_ids = data.get("slides", scene.slides.values_list('id', flat=True))
         scene.slides.set(Slide.objects.filter(id__in=slide_ids))
-        return JsonResponse({"message": f"Scene '{scene_name}' created successfully.", "scene_id": scene.id})
+
+        try:
+            scene.full_clean()
+            scene.save()
+            return JsonResponse({'status': 'success', 'id': scene.id, 'name': scene.name, 'updated_at': scene.updated_at, 'created_at': scene.created_at, 'tags': scene.tags})
+       
+        except ValidationError as e:
+            return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
+        
+    def delete(self, request, scene_id):
+        try:
+            scene = Scene.objects.get(id=scene_id)
+            scene.delete()
+            return JsonResponse({'message': 'Scene deleted successfully', 'status': 'success'})
+        except Scene.DoesNotExist:
+            return JsonResponse({'error': 'Scene not found', 'status': 'error'}, status=404)
+
+@method_decorator(csrf_exempt, name='dispatch')        
+class SceneTagView(View): 
+    
+    def get(self, request, tag_name): 
+        scenes = Scene.objects.filter(tags__icontains=tag_name)
+        
+        return JsonResponse([{
+            'id': scene.id,
+            'name': scene.name,
+            'created_at': scene.created_at,
+            'updated_at': scene.updated_at,
+            'tags': scene.tag_list,
+        } for scene in scenes], safe=False)
+        
+    def post(self, request, tag_name, scene_id):
+        try: 
+            scene = Scene.objects.get(id=scene_id)
+            tags = scene.tag_list
+            if tag_name not in tags:
+                tags.append(tag_name)
+                scene.tags = ', '.join(tags)
+            scene.save()
+            return JsonResponse({'message': 'Tag added successfully', 'status': 'success'})
+        except Scene.DoesNotExist:
+            return JsonResponse({'error': 'Scene not found', 'status': 'error'}, status=404)
+        
+    def delete(self, request, tag_name, scene_id):
+        try:
+            scene = Scene.objects.get(id=scene_id)
+            tags = scene.tag_list
+            if tag_name in tags:
+                tags.remove(tag_name)
+                scene.tags = ', '.join(tags)
+            scene.save()
+            return JsonResponse({'message': 'Tag removed successfully', 'status': 'success'})
+        except Scene.DoesNotExist:
+            return JsonResponse({'error': 'Scene not found', 'status': 'error'}, status=404)
+
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SlideView(View):
    
     def get(self, request, *args, **kwargs):
+        # old code: very unperfoment (N+1 queries if N slides)
+        #slides = list(Slide.objects.values('id', 'name', 'updated_at', 'created_at', 'width', 'height', 'tags'))
+        #for slide in slides:
+        #    tags = slide.pop('tags') or ''
+        #    slide['tags'] = [tag.strip() for tag in tags.split(',') if tag.strip()]
+        #    sections = SlideSection.objects.filter(slide_id=slide['id']).values()
+        #    slide['sections'] = list(sections)
         
-        slides = list(Slide.objects.values('id', 'name', 'updated_at', 'created_at', 'width', 'height', 'tags'))
+        #return JsonResponse(slides, safe=False)
+    
+        #Only 2 queries, independent of the number of slides, because of prefetch_related
+        slides_queryset = Slide.objects.prefetch_related('sections').all()
+    
+        result = []
+        for slide in slides_queryset:
+            # Greift auf die bereits im Cache liegenden Sektionen zu
+            sections_data = list(slide.sections.all().values())
         
-        for slide in slides:
-            tags = slide.pop('tags') or ''
-            slide['tags'] = [tag.strip() for tag in tags.split(',') if tag.strip()]
-            sections = SlideSection.objects.filter(slide_id=slide['id']).values()
-            slide['sections'] = list(sections)
+            result.append({
+                'id': slide.id,
+                'name': slide.name,
+                'updated_at': slide.updated_at,
+                'created_at': slide.created_at,
+                'width': slide.width,
+                'height': slide.height,
+                'tags': slide.tag_list,  # Nutzt dein vorhandenes Property!
+                'sections': sections_data
+            })
         
-        return JsonResponse(slides, safe=False)
+        return JsonResponse(result, safe=False)
 
     def post(self, request, *args, **kwargs):
         try:
@@ -201,7 +390,7 @@ class SlideDetailView(View):
             slide.full_clean()
             slide.save()
             return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 'markdown': slide.markdown, 
-                                 'updated_at': slide.updated_at, 'created_at': slide.created_at, 'tags': slide.tag_list})
+                                 'updated_at': slide.updated_at, 'created_at': slide.created_at, 'tags': slide.tags})
        
         except ValidationError as e:
             return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
@@ -270,7 +459,6 @@ class SlideTagView(View):
         return JsonResponse([{
             'id': slide.id,
             'name': slide.name,
-            'markdown': slide.markdown,
             'created_at': slide.created_at,
             'updated_at': slide.updated_at,
             'tags': slide.tag_list,
@@ -336,55 +524,56 @@ class EventAuthorize(View):
         valid = event.check_pin(pin)
         return JsonResponse({'valid': valid, 'message': 'Pin valid' if valid else 'Invalid pin'})
 
-# DL: global state
-LAST_UPDATED = {}
 
-def get_presentation_data(presentation_name):
-    try:
-        pres = Presentation.objects.get(name=presentation_name)
-        scene = Scene.objects.get(presentation=pres, scene_number=pres.current_scene)
-        return {
-            "scene": pres.current_scene,
-            "content": scene.content
-        }
-    except (Presentation.DoesNotExist, Scene.DoesNotExist):
-        return {"scene": 1, "content": "Keine Inhalte gefunden."}
 
-@csrf_exempt
-def switch_scene(request, name):
-    """ Steuert vor und zurück via POST """
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        direction = data.get('direction') # "next" oder "prev"
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SettingsView(View):
+   
+    def get(self, request, *args, **kwargs):
+        settings = list(Settings.objects.all())       
+        settings_list= [settings[0]] if settings else []
+        return JsonResponse({
+            'message': 'Settings read successfully.', 
+            'settings': model_to_dict(settings_list[0]) if settings_list else None
+        })
+
+    def patch(self, request):
+        return self._update(request)
         
-        pres, _ = Presentation.objects.get_or_create(name=name)
-        max_slides = pres.slides.count()
+    def _update(self, request):
+        settings = list(Settings.objects.all())       
+        settings_list = [settings[0]] if settings else []
+        print(settings_list) 
 
-        if direction == 'next' and pres.current_scene < max_slides:
-            pres.current_scene += 1
-        elif direction == 'prev' and pres.current_scene > 1:
-            pres.current_scene -= 1
+        if settings_list:
+            try:
+                data = json.loads(request.body)
+                setting_item = settings_list[0]
+                setting_item.cs_url = data.get('cs_url', setting_item.cs_url)
+                setting_item.number_of_screens = data.get('number_of_screens', setting_item.number_of_screens)
+                setting_item.background_image = data.get('background_image', setting_item.background_image)
+                setting_item.language = data.get('language', setting_item.language)
+                setting_item.save()
+                return JsonResponse({
+                    'message': 'Settings updated successfully.', 
+                    'settings': model_to_dict(setting_item)
+                })
+            except json.JSONDecodeError:
+                return JsonResponse({'error': 'Invalid JSON'}, status=400)
         else:
-            pres.current_scene = 1  # Zurück zum ersten Scene
+            try:
+                data = json.loads(request.body)
+            except json.JSONDecodeError:
+                return JsonResponse({'error': 'Invalid JSON'}, status=400)
+            new_settings = Settings.objects.create(
+                cs_url = data.get('cs_url', 'http://default-content-server.com'),
+                number_of_screens = data.get('number_of_screens', 4),
+                background_image = data.get('background_image', ''),
+                language = data.get('language', 'en')
+            )
+            return JsonResponse({
+                'message': 'Settings created successfully.', 
+                'settings': model_to_dict(new_settings)
+            })
 
-        pres.save()
-        LAST_UPDATED[name] = time.time() # Signalisiert dem SSE-Stream ein Update
-        
-        return JsonResponse(get_slide_data(name))
-
-def presentation_stream(request, name):
-    """ SSE Endpoint: Hält Verbindung offen und sendet Daten bei Änderung """
-    def event_stream():
-        last_seen = None
-        while True:
-            # Prüfen, ob sich der Zustand geändert hat
-            current_update = LAST_UPDATED.get(name, 0)
-            if last_seen is None or current_update > last_seen:
-                last_seen = current_update
-                data = get_slide_data(name)
-                yield f"data: {json.dumps(data)}\n\n"
-            time.sleep(0.5) # Polling-Intervall im Server-Thread
-
-    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
-    response['Cache-Control'] = 'no-cache'
-    return response

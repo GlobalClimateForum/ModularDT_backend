@@ -47,10 +47,19 @@ class Presentation(models.Model):
 class Scene(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    slides = models.ManyToManyField('Slide', related_name='scenes', blank=True)
+    slides = models.ManyToManyField('Slide', through='SlideInScenePosition', related_name='scenes', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    tags = models.TextField(blank=True)
 
     def __str__(self):
         return self.name
+    
+    @property
+    def tag_list(self): 
+        if not self.tags: 
+            return []
+        return [tag.strip() for tag in self.tags.split(',') if tag.strip()]
     
 class Group(models.Model):
     name = models.CharField(max_length=255)
@@ -90,3 +99,21 @@ class SlideSection(models.Model):
     content = models.TextField(blank=True)
     content_path = models.CharField(max_length=255, blank=True)
     mode = models.CharField(max_length=40, blank=True)
+
+class SlideInScenePosition(models.Model):
+    scene = models.ForeignKey(Scene, on_delete=models.CASCADE)
+    slide = models.ForeignKey(Slide, on_delete=models.CASCADE)
+    position = models.PositiveIntegerField()  
+
+    class Meta:
+        ordering = ['position']
+
+    def __str__(self):
+        return f"{self.scene.name} -> {self.slide.name} on Position {self.position}"
+
+class Settings(models.Model):
+    cs_url = models.CharField(max_length=255)
+    number_of_screens = models.IntegerField(default=4)
+    background_image = models.CharField(max_length=255)
+    language = models.CharField(max_length=255)
+
