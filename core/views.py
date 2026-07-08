@@ -16,8 +16,8 @@ import json
 
 from dtbackend import settings
 
-from .models import Event, Group, Presentation, Slide, Scene, SlideSection, Settings, SlideInScenePosition, Parameter, ParameterSet
-import datetime
+from .models import Event, Group, Presentation, SceneInPresentationPosition, Slide, Scene, SlideSection, Settings, SlideInScenePosition, Parameter, ParameterSet
+#import datetime
 
 def index(request):
     return HttpResponse("Hello, welcome to the Decision Theater backend server.")
@@ -91,6 +91,78 @@ class GroupView(View):
         group = Group.objects.create(name=group_name)
         return HttpResponse(f"Group '{group_name}' created successfully.")
     
+@method_decorator(csrf_exempt, name='dispatch')
+class PresentationView(View): 
+    
+    def get(self, request):
+        # Wir prefetchen die Zwischentabelle (sortiert nach Position) 
+        # und holen direkt die A-Objekte samt ihren Sections mit.
+        prefetch_through = Prefetch(
+            'sceneinpresentationposition_set',  # Django-Standardname für die Rückbeziehung der Zwischentabelle
+            queryset=SceneInPresentationPosition.objects.select_related('scene')
+        )
+        
+        presentations = Presentation.objects.prefetch_related(prefetch_through).all()
+
+        presentation_list = []
+        for presentation in presentations:
+            
+            scene_list = []
+            for line in presentation.sceneinpresentationposition_set.all():
+                scene = line.scene  
+                      
+                scene_list.append({
+                    "id": scene.id,
+                    "name": scene.name,
+                    "created_at": scene.created_at,
+                    "updated_at": scene.updated_at,
+                    "tags": scene.tag_list,  
+                    "position": line.position 
+                })
+
+            presentation_list.append({
+                "id": presentation.id,
+                "name": presentation.name,
+                "description": presentation.description,
+                "updated_at": presentation.updated_at,
+                "created_at": presentation.created_at
+            })
+
+        return JsonResponse({"presentations": presentation_list}, safe=False)
+
+
+    def post(self, request, *args, **kwargs):
+        try: 
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        
+        # expected JSON-Format for "as" im POST-Request:
+        # "as": [{"id": 1, "position": 1}, {"id": 2, "position": 3}, {"id": 2, "position": 4}]
+        presentation_data_list = data.get("as", [])
+        
+        presentation = Presentation.objects.create(
+            name=data.get('name', 'Untitled Presentation'),
+            description=data.get('description', '')
+        )
+
+        for item in presentation_data_list:
+            scene_id = item.get("id")
+            position = item.get("position")
+            
+            if scene_id is not None and position is not None:
+                try:
+                    scene = Scene.objects.get(id=scene_id)
+                    SceneInPresentationPosition.objects.create(
+                        presentation=presentation, 
+                        scene=scene, 
+                        position=position
+                    )
+                except Scene.DoesNotExist:
+                    return JsonResponse({'error': f'Scene with id {scene_id} does not exist'}, status=400)
+
+        return JsonResponse({"message": f"Presentation '{presentation.name}' created successfully.", "presentation_id": presentation.id})
+
 @method_decorator(csrf_exempt, name='dispatch')
 class SceneView(View): 
     
