@@ -17,5 +17,6 @@ urlpatterns = [
     path('scenes/<int:scene_id>/', views.SceneDetailView.as_view(), name='scene-detail'),
     path('tags/scenes/<str:tag_name>/', views.SceneTagView.as_view(), name='tag-scenes'),
     path('tags/<str:tag_name>/scene/<int:scene_id>/', views.SceneTagView.as_view(), name='tag-scene-remove'),
-    path('settings/', views.SettingsView.as_view(), name='settings')
+    path('settings/', views.SettingsView.as_view(), name='settings'),
+    path('parameters/<int:section_id>/', views.ParameterSetView.as_view(), name='parameters'),
 ]

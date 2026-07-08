@@ -10,12 +10,13 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.forms.models import model_to_dict
 from django.db.models import Prefetch
-
+from django.db import transaction
+ 
 import json
 
 from dtbackend import settings
 
-from .models import Event, Group, Presentation, Slide, Scene, SlideSection, Settings, SlideInScenePosition 
+from .models import Event, Group, Presentation, Slide, Scene, SlideSection, Settings, SlideInScenePosition, Parameter, ParameterSet
 import datetime
 
 def index(request):
@@ -105,7 +106,7 @@ class SceneView(View):
 
         scene_list = []
         for scene in scenes:
-            # Tags splitten wie bisher
+            # Tags splitten
             raw_tags = scene.tags or ''
             tag_list = [t.strip() for t in raw_tags.split(',') if t.strip()]
         
@@ -170,8 +171,7 @@ class SceneView(View):
                         position=position
                     )
                 except Slide.DoesNotExist:
-                    # Exception?
-                    pass
+                    return JsonResponse({'error': f'Slide with id {slide_id} does not exist'}, status=400)
 
         return JsonResponse({"message": f"Scene '{scene.name}' created successfully.", "scene_id": scene.id})
 
@@ -279,17 +279,7 @@ class SceneTagView(View):
 class SlideView(View):
    
     def get(self, request, *args, **kwargs):
-        # old code: very unperfoment (N+1 queries if N slides)
-        #slides = list(Slide.objects.values('id', 'name', 'updated_at', 'created_at', 'width', 'height', 'tags'))
-        #for slide in slides:
-        #    tags = slide.pop('tags') or ''
-        #    slide['tags'] = [tag.strip() for tag in tags.split(',') if tag.strip()]
-        #    sections = SlideSection.objects.filter(slide_id=slide['id']).values()
-        #    slide['sections'] = list(sections)
-        
-        #return JsonResponse(slides, safe=False)
-    
-        #Only 2 queries, independent of the number of slides, because of prefetch_related
+
         slides_queryset = Slide.objects.prefetch_related('sections').all()
     
         result = []
@@ -304,43 +294,85 @@ class SlideView(View):
                 'created_at': slide.created_at,
                 'width': slide.width,
                 'height': slide.height,
-                'tags': slide.tag_list,  # Nutzt dein vorhandenes Property!
+                'tags': slide.tag_list,
                 'sections': sections_data
             })
         
         return JsonResponse(result, safe=False)
-
+    
     def post(self, request, *args, **kwargs):
+
         try:
             
-            data = json.loads(request.body)
-            sections = data.get('sections', [])
-            
-            # Create the slide
-            slide = Slide.objects.create(
-                name=data.get('name', 'Untitled Slide'),
-                width=data.get('width', 1920),
-                height=data.get('height', 1080),
-                tags=', '.join(data.get('tags', []))
-            )
-            
-            # Create sections for the slide
-            for section_data in sections:
-                SlideSection.objects.create(
-                    slide=slide,
-                    view_type=section_data.get('view_type'),
-                    content=section_data.get('content'),
-                    content_path=section_data.get('content_path'),
-                    width_fraction=section_data.get('width_fraction', 1.0),
-                    mode=section_data.get('mode', '')
-                )
+            # TODO: Also creates ParameterSet for sections which dont have any paramers.
+            # Maybe thats also usefull in the future?
                 
-            return JsonResponse({'message': f'Slide "{slide.name}" created successfully.', 'slide_id': slide.id})
+            data = json.loads(request.body)
+            sections_data = data.get('sections', [])
             
+            # If one db transaction fails, the whole operation is rolled back, ensuring data integrity
+            with transaction.atomic():
+
+                # Create a new Slide instance
+                slide = Slide.objects.create(
+                    name=data.get('name', 'Untitled Slide'),
+                    width=data.get('width', 1920),
+                    height=data.get('height', 1080),
+                    tags=', '.join(data.get('tags', []))
+                )
+
+                # Create all section instances in bulk
+                section_objects = [
+                    SlideSection(
+                        slide=slide,
+                        view_type=section_data.get('view_type'),
+                        content=section_data.get('content'),
+                        content_path=section_data.get('content_path'),
+                        width_fraction=section_data.get('width_fraction', 1.0),
+                        mode=section_data.get('mode', '')
+                    )
+                    for section_data in sections_data
+                ]
+                SlideSection.objects.bulk_create(section_objects)
+
+                # Create ParameterSet instances in bulk
+                set_objects = [ ParameterSet(section=section_) for section_ in section_objects ]
+                ParameterSet.objects.bulk_create(set_objects)
+
+                # Build parameters
+                parameters_bulk = []
+                for pset, section_data in zip(set_objects, sections_data):
+                    
+                    # Get the parameters for the section, if any
+                    s_params = section_data.get('parameters', {})
+                    
+                    # parameter name = key, parameter data = values
+                    for p_name, p_data in s_params.items():
+                        p_type = p_data.get('type', 'string')  # Get the parameter type - defaults to string
+                        p_default = p_data.get('default', None) # Get the default value for the parameter - defaults to None
+                        # If the default value is None, we set it to an appropriate default based on the parameter type
+                        if p_default is None:
+                            p_default = "" if p_type in ['string', 'select'] else False if p_type == 'boolean' else 0
+
+                        # Add the parameter to the bulk list for creation
+                        parameters_bulk.append(Parameter(
+                            parameter_set=pset,
+                            name=p_name,
+                            description=p_data.get('description', ''),
+                            ptype=p_type,
+                            minimum=p_data.get('minimum'),
+                            maximum=p_data.get('maximum'),
+                            default=p_default
+                        ))
+
+                # Create the parameters in bulk if there are any to create
+                if parameters_bulk:
+                    Parameter.objects.bulk_create(parameters_bulk)
+
+                return JsonResponse({'message': f'Slide "{slide.name}" created successfully.', 'slide_id': slide.id})
+
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
-
-        print(data)
 
 @method_decorator(csrf_exempt, name='dispatch')    
 class SlideDetailView(View):
@@ -524,9 +556,6 @@ class EventAuthorize(View):
         valid = event.check_pin(pin)
         return JsonResponse({'valid': valid, 'message': 'Pin valid' if valid else 'Invalid pin'})
 
-
-
-
 @method_decorator(csrf_exempt, name='dispatch')
 class SettingsView(View):
    
@@ -577,3 +606,16 @@ class SettingsView(View):
                 'settings': model_to_dict(new_settings)
             })
 
+@method_decorator(csrf_exempt, name='dispatch')
+class ParameterSetView(View):
+    
+    def get(self, request, section_id):
+        try: 
+            parameter_set = ParameterSet.objects.prefetch_related('parameters').get(section_id=section_id)
+            parameters_data = list(parameter_set.parameters.all().values())
+            return JsonResponse({
+                'section_id': section_id,
+                'parameters': parameters_data
+            })  
+        except: 
+            return JsonResponse({'error': 'ParameterSet not found for the provided Section ID', 'status': 'error'}, status=404)
