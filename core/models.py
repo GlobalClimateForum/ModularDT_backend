@@ -130,3 +130,23 @@ class Group(models.Model):
 
     def __str__(self):
         return self.name
+    
+class Parameter(models.Model): 
+    
+    class ParameterType(models.TextChoices):
+        STRING = 'string', 'String'
+        NUMBER = 'number', 'Number'
+        BOOLEAN = 'boolean', 'Boolean'
+        SELECT = 'select', 'Select'
+    
+    parameter_set = models.ForeignKey('ParameterSet', related_name='parameters', on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    ptype = models.CharField(max_length=20, choices=ParameterType.choices, default=ParameterType.STRING) 
+    minimum = models.FloatField(null=True, blank=True)
+    maximum = models.FloatField(null=True, blank=True)
+    default = models.CharField(max_length=255, blank=True)
+    
+class ParameterSet(models.Model): 
+    section = models.ForeignKey(SlideSection, related_name='parameter_sets', on_delete=models.CASCADE)
+    
