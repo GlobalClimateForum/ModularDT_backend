@@ -520,7 +520,8 @@ class SlideSectionView(View):
                 'view_type': section.view_type,
                 'content': section.content,
                 'content_path': section.content_path, 
-                'width_fraction': section.width_fraction
+                'width_fraction': section.width_fraction,
+                'mode' : section.mode
             } for section in sections]
             return JsonResponse(sections_data, safe=False)
         
@@ -539,13 +540,15 @@ class SlideSectionView(View):
         content_path = data.get('content_path', '')
         slide = Slide.objects.get(id=slide_id)
         width_fraction = data.get('width_fraction', 1.0)
+        mode = data.get('mode', '')
         
         section = SlideSection.objects.create(
             slide=slide,
             view_type=view_type,
             content=content,
             content_path=content_path,
-            width_fraction=width_fraction
+            width_fraction=width_fraction,
+            mode = mode
         )
         
         return JsonResponse({
