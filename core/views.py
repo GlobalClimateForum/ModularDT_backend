@@ -694,3 +694,11 @@ class ParameterSetView(View):
             })  
         except: 
             return JsonResponse({'error': 'ParameterSet not found for the provided Section ID', 'status': 'error'}, status=404)
+        
+class InteractiveSlidesView(View):
+    
+    def get(self, request):
+        
+        # Fetch all slides that have at least one section with mode 'interactive'
+        interactive_slides = Slide.objects.filter(sections__mode='interactive').distinct()
+        return JsonResponse({'slides': [model_to_dict(slide) for slide in interactive_slides]})
