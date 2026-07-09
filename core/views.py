@@ -125,7 +125,8 @@ class PresentationView(View):
                 "name": presentation.name,
                 "description": presentation.description,
                 "updated_at": presentation.updated_at,
-                "created_at": presentation.created_at
+                "created_at": presentation.created_at,
+                "scenes": scene_list 
             })
 
         return JsonResponse({"presentations": presentation_list}, safe=False)
@@ -162,6 +163,92 @@ class PresentationView(View):
                     return JsonResponse({'error': f'Scene with id {scene_id} does not exist'}, status=400)
 
         return JsonResponse({"message": f"Presentation '{presentation.name}' created successfully.", "presentation_id": presentation.id})
+
+
+@method_decorator(csrf_exempt, name='dispatch')    
+class PresentationDetailView(View):
+            
+    def get(self, request, presentation_id):
+        try:
+            presentation = Presentation.objects.get(id=presentation_id).prefetch_related('scenes')
+            response_data = {
+                'id': presentation.id,
+                'name': presentation.name,
+                'description': presentation.description,
+                'created_at': presentation.created_at,
+                'updated_at': presentation.updated_at,
+                'scenes': list(presentation.scenes.all())
+            }
+
+            return JsonResponse(response_data)
+        except Presentation.DoesNotExist:
+            return JsonResponse({'error': 'Presentation not found', 'status': 'error'}, status=404)
+
+    def patch(self, request, presentation_id):
+        return self._update(request, presentation_id)
+        
+    def put(self, request, presentation_id):
+        return self._update(request, presentation_id)
+
+    def _update(self, request, presentation_id):
+        
+        try:
+            presentation = Presentation.objects.get(id=presentation_id)
+        except Presentation.DoesNotExist:
+            return JsonResponse({'error': 'Presentation not found', 'status': 'error'}, status=404)
+        
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON', 'status': 'error'}, status=400)
+        
+        presentation.name = data.get('name', presentation.name)
+        presentation.description = data.get('description', presentation.description)
+        presentation.updated_at = timezone.now()
+
+        try:
+            presentation.full_clean()
+            presentation.save()
+            return JsonResponse({'status': 'success', 'id': presentation.id, 'name': presentation.name, 'updated_at': presentation.updated_at, 'created_at': presentation.created_at, 'description': presentation.description})
+       
+        except ValidationError as e:
+            return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
+        
+    def delete(self, request, presentation_id):
+        try:
+            presentation = Presentation.objects.get(id=presentation_id)
+            presentation.delete()
+            return JsonResponse({'message': 'Presentation deleted successfully', 'status': 'success'})
+        except Presentation.DoesNotExist:
+            return JsonResponse({'error': 'Presentation not found', 'status': 'error'}, status=404)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SceneView(View): 
