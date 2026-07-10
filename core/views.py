@@ -1,5 +1,3 @@
-from unittest import result
-
 from django.shortcuts import render
 from django.http import HttpResponse
 from django.views import View
@@ -11,6 +9,7 @@ from django.views.decorators.http import require_POST
 from django.forms.models import model_to_dict
 from django.db.models import Prefetch
 from django.db import transaction
+from django.core.exceptions import ValidationError
  
 import json
 
@@ -22,6 +21,42 @@ from .models import Event, Group, Presentation, SceneInPresentationPosition, Sli
 def index(request):
     return HttpResponse("Hello, welcome to the Decision Theater backend server.")
 
+def coerce_default(ptype, raw):
+    if raw == '' or raw is None:
+        return None
+    if ptype == 'number':
+        return float(raw)
+    if ptype == 'boolean':
+        return str(raw).lower() == 'true'
+    return raw
+
+def serialize_parameters(pset):
+    """Turn a ParameterSet into the name-keyed dict the frontend expects."""
+    params = {}
+    if pset:
+        for p in pset.parameters.all():
+            params[p.name] = {
+                'type': p.ptype,
+                'description': p.description,
+                'range': {'min': p.minimum, 'max': p.maximum} if p.ptype == 'number' else None,
+                'default': coerce_default(p.ptype, p.default),
+                'options': p.options,
+            }
+    return params
+
+def serialize_section(section):
+    """Turn a SlideSection into the dict the frontend expects, including its parameters."""
+    pset = section.parameter_sets.first()
+    return {
+        'id': section.id,
+        'view_type': section.view_type,
+        'width_fraction': section.width_fraction,
+        'content': section.content,
+        'content_path': section.content_path,
+        'mode': section.mode,
+        'url_pattern': section.url_pattern,
+        'parameters': serialize_parameters(pset),
+    }
 
 class EventView(View):
 
@@ -222,34 +257,6 @@ class PresentationDetailView(View):
         except Presentation.DoesNotExist:
             return JsonResponse({'error': 'Presentation not found', 'status': 'error'}, status=404)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 @method_decorator(csrf_exempt, name='dispatch')
 class SceneView(View): 
     
@@ -257,8 +264,9 @@ class SceneView(View):
         # Wir prefetchen die Zwischentabelle (sortiert nach Position) 
         # und holen direkt die A-Objekte samt ihren Sections mit.
         prefetch_through = Prefetch(
-            'slideinsceneposition_set',  # Django-Standardname für die Rückbeziehung der Zwischentabelle
-            queryset=SlideInScenePosition.objects.select_related('slide').prefetch_related('slide__sections')
+            'slideinsceneposition_set',
+            queryset=SlideInScenePosition.objects.select_related('slide')
+                .prefetch_related('slide__sections__parameter_sets__parameters')
         )
         
         scenes = Scene.objects.prefetch_related(prefetch_through).all()
@@ -274,7 +282,7 @@ class SceneView(View):
                 slide = line.slide  # Das eigentliche A-Objekt
             
                 # Sections vom verknüpften A-Objekt holen
-                section_list = list(slide.sections.all().values())
+                section_list = [serialize_section(s) for s in slide.sections.all()]
             
                 slide_list.append({
                     "id": slide.id,
@@ -340,20 +348,28 @@ class SceneDetailView(View):
             
     def get(self, request, scene_id):
         try:
-            scene = Scene.objects.get(id=scene_id).prefetch_related('slides')
-            #sections = list(SlideSection.objects.filter(scene_id=scene['id']))
-            response_data = {
-                'id': scene.id,
-                'name': scene.name,
-                'created_at': scene.created_at,
-                'updated_at': scene.updated_at,
-                'tags': scene.tag_list,
-                'slides': list(scene.slides.all())
-            }
-
-            return JsonResponse(response_data)
+            scene = Scene.objects.prefetch_related('slides__sections__parameter_sets__parameters').get(id=scene_id)
         except Scene.DoesNotExist:
             return JsonResponse({'error': 'Scene not found', 'status': 'error'}, status=404)
+        
+        response_data = {
+            'id': scene.id,
+            'name': scene.name,
+            'created_at': scene.created_at,
+            'updated_at': scene.updated_at,
+            'tags': scene.tag_list,
+            'slides': [{
+                'id': slide.id,
+                'name': slide.name,
+                'created_at': slide.created_at,
+                'updated_at': slide.updated_at,
+                'width': slide.width,
+                'height': slide.height,
+                'tags': slide.tag_list,
+                'sections': [serialize_section(s) for s in slide.sections.all()],
+            } for slide in scene.slides.all()],
+        }
+        return JsonResponse(response_data)
 
     def patch(self, request, scene_id):
         return self._update(request, scene_id)
@@ -439,24 +455,23 @@ class SlideView(View):
    
     def get(self, request, *args, **kwargs):
 
-        slides_queryset = Slide.objects.prefetch_related('sections').all()
-    
-        result = []
-        for slide in slides_queryset:
-            # Greift auf die bereits im Cache liegenden Sektionen zu
-            sections_data = list(slide.sections.all().values())
+        slides_queryset = Slide.objects.prefetch_related(
+            'sections__parameter_sets__parameters'
+        ).all()
         
+        result = []
+        for slide in slides_queryset: 
             result.append({
                 'id': slide.id,
                 'name': slide.name,
-                'updated_at': slide.updated_at,
                 'created_at': slide.created_at,
+                'updated_at': slide.updated_at,
                 'width': slide.width,
                 'height': slide.height,
-                'tags': slide.tag_list,
-                'sections': sections_data
+                'tags': slide.tag_list, 
+                'sections': [serialize_section(s) for s in slide.sections.all()]
             })
-        
+    
         return JsonResponse(result, safe=False)
     
     def post(self, request, *args, **kwargs):
@@ -538,8 +553,9 @@ class SlideDetailView(View):
             
     def get(self, request, slide_id):
         try:
-            slide = Slide.objects.get(id=slide_id)
-            sections = list(SlideSection.objects.filter(slide_id=slide['id']))
+            slide = Slide.objects.prefetch_related(
+                'sections__parameter_sets__parameters'
+            ).get(id=slide_id)
             response_data = {
                 'id': slide.id,
                 'name': slide.name,
@@ -548,7 +564,7 @@ class SlideDetailView(View):
                 'tags': slide.tag_list,
                 'width': slide.width,
                 'height': slide.height,
-                'sections': [{'id': section.id, 'width_fraction': section.width_fraction, 'view_type': section.view_type, 'content': section.content, 'content_path': section.content_path} for section in sections]
+                'sections': [serialize_section(s) for s in slide.sections.all()],
             }
             return JsonResponse(response_data)
         except Slide.DoesNotExist:
@@ -573,14 +589,13 @@ class SlideDetailView(View):
             return JsonResponse({'error': 'Invalid JSON', 'status': 'error'}, status=400)
         
         slide.name = data.get('name', slide.name)
-        slide.markdown = data.get('markdown', slide.markdown)
         slide.tags = ', '.join(data.get('tags', slide.tag_list))
         slide.updated_at = timezone.now()
         
         try:
             slide.full_clean()
             slide.save()
-            return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 'markdown': slide.markdown, 
+            return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 
                                  'updated_at': slide.updated_at, 'created_at': slide.created_at, 'tags': slide.tags})
        
         except ValidationError as e:
@@ -598,52 +613,43 @@ class SlideDetailView(View):
 class SlideSectionView(View):
     
     def get(self, request, slide_id):
-        
         try:
-            sections = SlideSection.objects.filter(slide_id=slide_id)
-            sections_data = [{
-                'id': section.id,
-                'slide_id': section.id,
-                'view_type': section.view_type,
-                'content': section.content,
-                'content_path': section.content_path, 
-                'width_fraction': section.width_fraction,
-                'mode' : section.mode
-            } for section in sections]
+            sections = SlideSection.objects.filter(slide_id=slide_id) \
+                .prefetch_related('parameter_sets__parameters')
+            sections_data = [serialize_section(s) for s in sections]
             return JsonResponse(sections_data, safe=False)
         
         except SlideSection.DoesNotExist:
             return JsonResponse({'error': 'Slide sections not found for the provided Slide ID', 'status': 'error'}, status=404)
     
-    def post(self, request, slide_id): 
+    def post(self, request, slide_id):
         
-        try: 
+        try:
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON', 'status': 'error'}, status=400)
-        
-        view_type = data.get('view_type')
-        content = data.get('content', '')
-        content_path = data.get('content_path', '')
-        slide = Slide.objects.get(id=slide_id)
-        width_fraction = data.get('width_fraction', 1.0)
-        mode = data.get('mode', '')
-        
+
+        try:
+            slide = Slide.objects.get(id=slide_id)
+        except Slide.DoesNotExist:
+            return JsonResponse({'error': 'Slide not found', 'status': 'error'}, status=404)
+
         section = SlideSection.objects.create(
             slide=slide,
-            view_type=view_type,
-            content=content,
-            content_path=content_path,
-            width_fraction=width_fraction,
-            mode = mode
+            view_type=data.get('view_type'),
+            content=data.get('content', ''),
+            content_path=data.get('content_path', ''),
+            width_fraction=data.get('width_fraction', 1.0),
+            mode=data.get('mode', ''),
+            url_pattern=data.get('url_pattern', ''),
         )
-        
+
         return JsonResponse({
             'message': 'Slide section created successfully',
             'status': 'success',
             'section_id': section.id,
-        })  
-
+        })
+        
 @method_decorator(csrf_exempt, name='dispatch')        
 class SlideTagView(View): 
     
@@ -696,8 +702,8 @@ class EventDetailView(View):
             'description': event.description,
             'date': event.date,
             'n_groups': event.n_groups,
-            'n_monitor': event.n_monitor,
-            'scenes': list(event.scenes.values('id', 'title')),
+            'n_monitor': event.nmonitors(),
+            'monitors': list(event.monitors.values('id', 'name'))
         })
 
 class EventAuthorize(View): 
@@ -772,20 +778,28 @@ class SettingsView(View):
 class ParameterSetView(View):
     
     def get(self, request, section_id):
-        try: 
+        try:
             parameter_set = ParameterSet.objects.prefetch_related('parameters').get(section_id=section_id)
-            parameters_data = list(parameter_set.parameters.all().values())
-            return JsonResponse({
-                'section_id': section_id,
-                'parameters': parameters_data
-            })  
-        except: 
+        except ParameterSet.DoesNotExist:
             return JsonResponse({'error': 'ParameterSet not found for the provided Section ID', 'status': 'error'}, status=404)
+
+        return JsonResponse({
+            'section_id': section_id,
+            'parameters': serialize_parameters(parameter_set),
+        })
         
 class InteractiveSlidesView(View):
     
     def get(self, request):
-        
-        # Fetch all slides that have at least one section with mode 'interactive'
-        interactive_slides = Slide.objects.filter(sections__mode='interactive').distinct()
-        return JsonResponse({'slides': [model_to_dict(slide) for slide in interactive_slides]})
+        interactive_slides = Slide.objects.filter(
+            sections__mode='interactive'
+        ).distinct().prefetch_related('sections__parameter_sets__parameters')
+
+        return JsonResponse([{
+            'id': slide.id,
+            'name': slide.name,
+            'created_at': slide.created_at,
+            'updated_at': slide.updated_at,
+            'tags': slide.tag_list,
+            'sections': [serialize_section(s) for s in slide.sections.all()],
+        } for slide in interactive_slides], safe=False)
