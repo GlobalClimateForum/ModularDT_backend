@@ -57,6 +57,15 @@ def serialize_section(section):
         'url_pattern': section.url_pattern,
         'parameters': serialize_parameters(pset),
     }
+    
+class health_check(View):
+    
+    def get(self, request):
+        return JsonResponse({
+            "status": "online",
+            "message": "server is running smoothly",
+            "timestamp": timezone.now().isoformat()
+        })
 
 class EventView(View):
 
