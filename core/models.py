@@ -152,7 +152,7 @@ class Parameter(models.Model):
     minimum = models.FloatField(null=True, blank=True)
     maximum = models.FloatField(null=True, blank=True)
     default = models.CharField(max_length=255, blank=True)
+    options = models.JSONField(default=list, blank=True)
     
 class ParameterSet(models.Model): 
     section = models.ForeignKey(SlideSection, related_name='parameter_sets', on_delete=models.CASCADE)
-    
