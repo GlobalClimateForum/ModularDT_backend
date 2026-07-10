@@ -214,17 +214,23 @@ class PresentationDetailView(View):
             
     def get(self, request, presentation_id):
         try:
-            presentation = Presentation.objects.get(id=presentation_id).prefetch_related('scenes')
-            response_data = {
+            # Korrektur: prefetch_related MUSS vor .get() stehen
+            presentation = Presentation.objects.prefetch_related('scenes').get(id=presentation_id)
+            
+            # Wir nutzen die durch 'ordering = ["position"]' im Modell 
+            # bereits automatisch sortierten Szenen der Presentation
+            return JsonResponse({
                 'id': presentation.id,
                 'name': presentation.name,
                 'description': presentation.description,
                 'created_at': presentation.created_at,
                 'updated_at': presentation.updated_at,
-                'scenes': list(presentation.scenes.all())
-            }
-
-            return JsonResponse(response_data)
+                'scenes': [{
+                    'id': scene.id,
+                    'name': scene.name,
+                    'description': scene.description
+                } for scene in presentation.scenes.all()]
+            })
         except Presentation.DoesNotExist:
             return JsonResponse({'error': 'Presentation not found', 'status': 'error'}, status=404)
 
@@ -235,36 +241,68 @@ class PresentationDetailView(View):
         return self._update(request, presentation_id)
 
     def _update(self, request, presentation_id):
-        
         try:
             presentation = Presentation.objects.get(id=presentation_id)
         except Presentation.DoesNotExist:
             return JsonResponse({'error': 'Presentation not found', 'status': 'error'}, status=404)
-        
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON', 'status': 'error'}, status=400)
-        
-        presentation.name = data.get('name', presentation.name)
-        presentation.description = data.get('description', presentation.description)
-        presentation.updated_at = timezone.now()
 
         try:
-            presentation.full_clean()
-            presentation.save()
-            return JsonResponse({'status': 'success', 'id': presentation.id, 'name': presentation.name, 'updated_at': presentation.updated_at, 'created_at': presentation.created_at, 'description': presentation.description})
-       
-        except ValidationError as e:
-            return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
+            # JSON-Daten aus dem Vue-Frontend auslesen
+            data = json.loads(request.body)
+            scenes_data = data.get('scenes', []) # Erwartet: [{"scene_id": "...", "position": 0}, ...]
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data', 'status': 'error'}, status=400)
+
+        # Transaktionsblock: Schützt die DB, falls eine scene_id ungültig ist
+        with transaction.atomic():
+            # 1. Alle alten Verknüpfungen für diese Präsentation löschen
+            SceneInPresentationPosition.objects.filter(presentation=presentation).delete()
+
+            # 2. Neue Positionen vorbereiten und validieren
+            new_positions = []
+            for item in scenes_data:
+                scene_id = item.get('scene_id')
+                position = item.get('position')
+
+                if scene_id is None or position is None:
+                    return JsonResponse({'error': 'Missing scene_id or position', 'status': 'error'}, status=400)
+
+                try:
+                    scene = Scene.objects.get(id=scene_id)
+                    new_positions.append(
+                        SceneInPresentationPosition(
+                            presentation=presentation,
+                            scene=scene,
+                            position=position
+                        )
+                    )
+                except Scene.DoesNotExist:
+                    # Automatischer Rollback durch transaction.atomic()
+                    return JsonResponse({'error': f'Scene with ID {scene_id} not found', 'status': 'error'}, status=400)
+
+            # 3. Bulk-Insert für maximale Performance
+            SceneInPresentationPosition.objects.bulk_create(new_positions)
+
+        # 4. Erfolgsantwort: Wir geben direkt das aktualisierte Objekt (wie im GET) zurück
+        # Dazu holen wir die Präsentation frisch mit den neuen Verknüpfungen aus der DB
+        updated_presentation = Presentation.objects.prefetch_related('scenes').get(id=presentation_id)
         
-    def delete(self, request, presentation_id):
-        try:
-            presentation = Presentation.objects.get(id=presentation_id)
-            presentation.delete()
-            return JsonResponse({'message': 'Presentation deleted successfully', 'status': 'success'})
-        except Presentation.DoesNotExist:
-            return JsonResponse({'error': 'Presentation not found', 'status': 'error'}, status=404)
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Order updated successfully',
+            'presentation': {
+                'id': updated_presentation.id,
+                'name': updated_presentation.name,
+                'description': updated_presentation.description,
+                'created_at': updated_presentation.created_at,
+                'updated_at': updated_presentation.updated_at,
+                'scenes': [{
+                    'id': scene.id,
+                    'name': scene.name,
+                    'description': scene.description
+                } for scene in updated_presentation.scenes.all()]
+            }
+        }, status=200)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SceneView(View): 
