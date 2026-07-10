@@ -64,12 +64,18 @@ class SlideSection(models.Model):
         VIDEO = 'video', 'Video'
         CHART = 'chart', 'Chart'
     
+    class SectionMode(models.TextChoices): 
+        STATIC = 'static', 'Static'
+        URL = 'url', 'URL'
+        INTERACTIVE = 'interactive', 'Interactive'
+    
     slide = models.ForeignKey(Slide, related_name='sections', on_delete=models.CASCADE)
     width_fraction = models.FloatField(default=1.0)
     view_type = models.CharField(max_length=20, choices=SectionType.choices, default=SectionType.TEXT)
     content = models.TextField(blank=True)
     content_path = models.CharField(max_length=255, blank=True)
-    mode = models.CharField(max_length=40, blank=True)
+    mode = models.CharField(max_length=20, choices=SectionMode.choices, blank=True)
+    url_pattern = models.CharField(max_length=255, blank=True, default='')
 
 class SlideInScenePosition(models.Model):
     slide = models.ForeignKey(Slide, on_delete=models.CASCADE)
