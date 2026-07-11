@@ -15,7 +15,7 @@ import json
 
 from dtbackend import settings
 
-from .models import Event, Group, Presentation, SceneInPresentationPosition, Slide, Scene, SlideSection, Settings, SlideInScenePosition, Parameter, ParameterSet
+from .models import Event, Group, Presentation, SceneInPresentationPosition, Slide, Scene, SlideSection, Settings, SlideInScenePosition, LivePresentation, Parameter, ParameterSet
 #import datetime
 
 def index(request):
@@ -214,11 +214,8 @@ class PresentationDetailView(View):
             
     def get(self, request, presentation_id):
         try:
-            # Korrektur: prefetch_related MUSS vor .get() stehen
             presentation = Presentation.objects.prefetch_related('scenes').get(id=presentation_id)
             
-            # Wir nutzen die durch 'ordering = ["position"]' im Modell 
-            # bereits automatisch sortierten Szenen der Presentation
             return JsonResponse({
                 'id': presentation.id,
                 'name': presentation.name,
@@ -303,6 +300,57 @@ class PresentationDetailView(View):
                 } for scene in updated_presentation.scenes.all()]
             }
         }, status=200)
+    
+@method_decorator(csrf_exempt, name='dispatch')
+class LivePresentationView(View):
+   
+    def get(self, request, *args, **kwargs):
+        live_presentation = list(LivePresentation.objects.all())       
+        live_presentation_list = [live_presentation[0]] if live_presentation else []
+        return JsonResponse({
+            'message': 'LivePresentation read successfully.', 
+            'live_presentation': model_to_dict(live_presentation_list[0]) if live_presentation_list else None
+        })
+    
+
+    def patch(self, request):
+        return self._update(request)
+        
+    def _update(self, request):
+        live_presentation = LivePresentation.objects.first()
+
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+        if live_presentation:
+            if 'presentation' in data:
+                live_presentation.presentation_id = data.get('presentation')
+            
+            live_presentation.active = data.get('active', live_presentation.active)
+            live_presentation.current_scene = data.get('current_scene', live_presentation.current_scene)
+            live_presentation.save()
+            
+            return JsonResponse({
+                'message': 'Live presentation updated successfully.', 
+                'settings': model_to_dict(live_presentation)
+            })
+        else:
+            # CREATE neuer Eintrag
+            presentation_id = data.get('presentation')
+            if not presentation_id:
+                return JsonResponse({'error': 'presentation id is required to create'}, status=400)
+
+            new_live_presentation = LivePresentation.objects.create(
+                presentation_id=presentation_id,
+                active=data.get('active', False), 
+                current_scene=data.get('current_scene', 0) 
+            )
+            return JsonResponse({
+                'message': 'LivePresentation created successfully.', 
+                'settings': model_to_dict(new_live_presentation)
+            })
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SceneView(View): 

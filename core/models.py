@@ -1,6 +1,20 @@
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
 
+
+class LivePresentation(models.Model):
+    presentation = models.ForeignKey(
+        'Presentation', 
+        related_name='live_presentation',
+        on_delete=models.CASCADE 
+    )
+    
+    active = models.BooleanField(default=True)
+    current_scene = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.presentation.name} - {self.current_scene}"
+
     
 class Presentation(models.Model):
     name = models.CharField(max_length=255, unique=True)
