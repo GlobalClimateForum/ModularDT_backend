@@ -301,6 +301,22 @@ class PresentationDetailView(View):
             }
         }, status=200)
     
+    def delete(self, request, presentation_id):
+        try:
+            presentation = Presentation.objects.get(id=presentation_id)
+            presentation.delete()
+            return JsonResponse({
+                'status': 'success',
+                'message': f'Presentation with ID {presentation_id} deleted successfully.'
+            }, status=200) 
+            
+        except Presentation.DoesNotExist:
+            return JsonResponse({
+                'error': 'Presentation not found', 
+                'status': 'error'
+            }, status=404)
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class LivePresentationView(View):
    
@@ -337,7 +353,6 @@ class LivePresentationView(View):
                 'settings': model_to_dict(live_presentation)
             })
         else:
-            # CREATE neuer Eintrag
             presentation_id = data.get('presentation')
             if not presentation_id:
                 return JsonResponse({'error': 'presentation id is required to create'}, status=400)
