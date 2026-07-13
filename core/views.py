@@ -10,6 +10,8 @@ from django.forms.models import model_to_dict
 from django.db.models import Prefetch
 from django.db import transaction
 from django.core.exceptions import ValidationError
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
  
 import json
 
@@ -88,7 +90,8 @@ class EventView(View):
             n_groups=n_groups,
         )
         return HttpResponse(f"Event '{event_name}' created successfully.")
-    
+
+
 class MonitorView(View):
     
     def get(self, request, event_id):
@@ -104,26 +107,32 @@ class MonitorView(View):
         }
         return JsonResponse(monitor_data)
     
-    def post(self, request, event_id):
-        try:
-            event = Event.objects.get(eventID=event_id)
-        except Event.DoesNotExist:
-            return JsonResponse({'error': 'Event not found'}, status=404)
-
+    def update(self, monitor_id, text):
+        channel_layer = get_channel_layer()
+        group_name = f'monitor_{monitor_id}'
+    
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                'type': 'send_monitor_message', 
+                'message': text
+            }
+        )
+         
+    def post(self, request, monitor_id):
         try:
             data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+            nachricht = data.get('text', 'Standard-Update')
+            self.trigger_monitor_update(monitor_id, nachricht)
+            
+            return JsonResponse({
+                "status": "Erfolgreich", 
+                "monitor_id": monitor_id
+            })
+        except Exception as e:
+            return JsonResponse({"status": "Fehler", "error": str(e)}, status=400)
 
-        monitor_name = data.get('name')
-        aspect_ratio = data.get('aspect', '16:9')
 
-        if not monitor_name:
-            return JsonResponse({'error': 'Monitor name is required'}, status=400)
-
-        monitor = event.monitors.create(name=monitor_name, aspect=aspect_ratio)
-        return JsonResponse({'message': f'Monitor "{monitor_name}" added to event "{event.name}".', 'monitor_id': monitor.id})
-  
 class GroupView(View):
     def get(self, request):
         groups = Group.objects.all()
@@ -340,6 +349,26 @@ class LivePresentationView(View):
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+        presentation_id = data.get('presentation')
+        is_active = data.get('active', False)
+        current_scene = data.get('current_scene', 1)
+            
+        channel_layer = get_channel_layer()    
+        global_group_name = 'all_monitors'
+            
+        async_to_sync(channel_layer.group_send)(
+            global_group_name,
+                {
+                    'type': 'send_monitor_message', 
+                    'payload': {
+                        'event_type': 'presentation_start' if is_active else 'presentation_stop',
+                        'presentation_id': presentation_id,
+                        'current_scene': current_scene,
+                        'active': is_active
+                    }
+                }
+            )
 
         if live_presentation:
             if 'presentation' in data:

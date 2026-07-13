@@ -25,12 +25,12 @@ SECRET_KEY = 'django-insecure-=q$-s5(_)#59^)fm7p_#sv4blh1s4)et@z1&z!28@&v=s$clgh
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',  # MUSS ganz oben stehen!
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -39,7 +39,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'core.apps.CoreConfig',
     'corsheaders', 
-    'django_dbml'
+    'django_dbml',
+    'channels',
+    'dtbackend'
 ]
 
 MIDDLEWARE = [
@@ -131,3 +133,12 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Django channels
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}
+
+ASGI_APPLICATION = 'dtbackend.asgi.application' 
