@@ -56,6 +56,7 @@ def serialize_section(section):
         'mode': section.mode,
         'url_pattern': section.url_pattern,
         'parameters': serialize_parameters(pset),
+        'properties': section.properties
     }
     
 class health_check(View):
@@ -613,7 +614,8 @@ class SlideView(View):
                         content=section_data.get('content'),
                         content_path=section_data.get('content_path'),
                         width_fraction=section_data.get('width_fraction', 1.0),
-                        mode=section_data.get('mode', '')
+                        mode=section_data.get('mode', ''),
+                        properties=section_data.get('properties', {}),
                     )
                     for section_data in sections_data
                 ]
@@ -752,6 +754,7 @@ class SlideSectionView(View):
             width_fraction=data.get('width_fraction', 1.0),
             mode=data.get('mode', ''),
             url_pattern=data.get('url_pattern', ''),
+            properties=section_data.get('properties', {}),
         )
 
         return JsonResponse({

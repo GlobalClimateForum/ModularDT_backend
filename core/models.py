@@ -90,6 +90,7 @@ class SlideSection(models.Model):
     content_path = models.CharField(max_length=255, blank=True)
     mode = models.CharField(max_length=20, choices=SectionMode.choices, blank=True)
     url_pattern = models.CharField(max_length=255, blank=True, default='')
+    properties = models.JSONField(default=dict, blank=True)
 
 class SlideInScenePosition(models.Model):
     slide = models.ForeignKey(Slide, on_delete=models.CASCADE)
