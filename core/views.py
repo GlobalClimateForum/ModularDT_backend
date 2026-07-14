@@ -107,23 +107,22 @@ class MonitorView(View):
         }
         return JsonResponse(monitor_data)
     
-    def update(self, monitor_id, text):
+    def update(self, monitor_id, request):
         channel_layer = get_channel_layer()
         group_name = f'monitor_{monitor_id}'
+        data = json.loads(request.body)
     
         async_to_sync(channel_layer.group_send)(
             group_name,
             {
                 'type': 'send_monitor_message', 
-                'message': text
+                'payload': data.payload
             }
         )
          
     def post(self, request, monitor_id):
         try:
-            data = json.loads(request.body)
-            nachricht = data.get('text', 'Standard-Update')
-            self.trigger_monitor_update(monitor_id, nachricht)
+            self.trigger_monitor_update(monitor_id, request)
             
             return JsonResponse({
                 "status": "Erfolgreich", 
@@ -131,6 +130,33 @@ class MonitorView(View):
             })
         except Exception as e:
             return JsonResponse({"status": "Fehler", "error": str(e)}, status=400)
+
+    #def post(self, request):
+     #   try:
+      #      data = json.loads(request.body)
+       #     monitor_id = data.get('monitor_id') 
+        #    current_slide_id = data.get('current_slide_id')
+#
+ #           channel_layer = get_channel_layer()
+  #          
+   #         # KORREKTUR: Gruppe dynamisch anhand der übergebenen ID bestimmen
+    #        # Wenn monitor_id=3 ist, wird nur an 'monitor_3' gesendet
+     #       target_group = f'monitor_{monitor_id}'
+#
+ #           async_to_sync(channel_layer.group_send)(
+  #              target_group,
+   #             {
+    #                'type': 'send_monitor_message',
+     #               'payload': {
+      #                  'event_type': 'slide_change',
+       #                 'current_slide_id': current_slide_id
+        #            }
+         #       }
+          #  )
+
+#            return JsonResponse({"status": f"Slide change for monitor {monitor_id}"})
+#        except Exception as e:
+#            return JsonResponse({"status": "Error", "error": str(e)}, status=400)
 
 
 class GroupView(View):
