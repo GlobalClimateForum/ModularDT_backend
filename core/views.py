@@ -644,6 +644,7 @@ class SlideView(View):
                         content_path=section_data.get('content_path'),
                         width_fraction=section_data.get('width_fraction', 1.0),
                         mode=section_data.get('mode', ''),
+                        url_pattern=section_data.get('url_pattern', ''),
                         properties=section_data.get('properties', {}),
                     )
                     for section_data in sections_data
