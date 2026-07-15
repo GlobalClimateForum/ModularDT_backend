@@ -704,7 +704,8 @@ class SlideView(View):
                             ptype=p_type,
                             minimum=p_data.get('minimum'),
                             maximum=p_data.get('maximum'),
-                            default=p_default
+                            default=p_default,
+                            options=p_data.get('options', []),
                         ))
 
                 # Create the parameters in bulk if there are any to create
@@ -970,5 +971,7 @@ class InteractiveSlidesView(View):
             'created_at': slide.created_at,
             'updated_at': slide.updated_at,
             'tags': slide.tag_list,
+            'width': slide.width,
+            'height': slide.height,
             'sections': [serialize_section(s) for s in slide.sections.all()],
         } for slide in interactive_slides], safe=False)
