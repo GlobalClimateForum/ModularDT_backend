@@ -91,7 +91,7 @@ class EventView(View):
         )
         return HttpResponse(f"Event '{event_name}' created successfully.")
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class MonitorView(View):
     
     def get(self, request, event_id):
@@ -106,23 +106,13 @@ class MonitorView(View):
             'monitors': list(event.monitors.values('id', 'name')),
         }
         return JsonResponse(monitor_data)
-    
-    def update(self, monitor_id, request):
-        channel_layer = get_channel_layer()
-        group_name = f'monitor_{monitor_id}'
-        data = json.loads(request.body)
-    
-        async_to_sync(channel_layer.group_send)(
-            group_name,
-            {
-                'type': 'send_monitor_message', 
-                'payload': data.payload
-            }
-        )
+
+    def patch(self, request, monitor_id):
+        return self._update(request, monitor_id)
          
     def post(self, request, monitor_id):
         try:
-            self.trigger_monitor_update(monitor_id, request)
+            self._update(request, monitor_id)
             
             return JsonResponse({
                 "status": "Erfolgreich", 
@@ -131,32 +121,19 @@ class MonitorView(View):
         except Exception as e:
             return JsonResponse({"status": "Fehler", "error": str(e)}, status=400)
 
-    #def post(self, request):
-     #   try:
-      #      data = json.loads(request.body)
-       #     monitor_id = data.get('monitor_id') 
-        #    current_slide_id = data.get('current_slide_id')
-#
- #           channel_layer = get_channel_layer()
-  #          
-   #         # KORREKTUR: Gruppe dynamisch anhand der übergebenen ID bestimmen
-    #        # Wenn monitor_id=3 ist, wird nur an 'monitor_3' gesendet
-     #       target_group = f'monitor_{monitor_id}'
-#
- #           async_to_sync(channel_layer.group_send)(
-  #              target_group,
-   #             {
-    #                'type': 'send_monitor_message',
-     #               'payload': {
-      #                  'event_type': 'slide_change',
-       #                 'current_slide_id': current_slide_id
-        #            }
-         #       }
-          #  )
-
-#            return JsonResponse({"status": f"Slide change for monitor {monitor_id}"})
-#        except Exception as e:
-#            return JsonResponse({"status": "Error", "error": str(e)}, status=400)
+    def _update(self, request, monitor_id):
+        channel_layer = get_channel_layer()
+        group_name = f'monitor_{monitor_id}'
+        data = json.loads(request.body)
+    
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                'type': 'send_monitor_message', 
+                'payload': data.get('payload') 
+            }
+        )
+        return JsonResponse({"status": "success", "message": "Monitor updated"})
 
 
 class GroupView(View):
