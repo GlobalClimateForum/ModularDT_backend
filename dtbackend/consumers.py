@@ -34,3 +34,37 @@ class MonitorConsumer(AsyncWebsocketConsumer):
 
         # Und senden es als JSON direkt ans Vue-Frontend
         await self.send(text_data=json.dumps(payload))
+        
+class ParameterConsumer(AsyncWebsocketConsumer):
+    GROUP = "parameters"
+
+    # connect method is called when a WebSocket connection is established
+    async def connect(self):
+        await self.channel_layer.group_add(self.GROUP, self.channel_name)  # Add the client to the group
+        await self.accept() # Accept the WebSocket connection
+
+    # disconnect method is called when the WebSocket connection is closed
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.GROUP, self.channel_name) # Remove the client from the group
+
+    # If the consumer receives a message from the WebSocket, it will send it to the group
+    async def receive(self, text_data=None, bytes_data=None):
+        content = json.loads(text_data)
+        await self.channel_layer.group_send(
+            self.GROUP,
+            {
+                "type": "parameter.change",
+                "section": content["section"],
+                "parameter": content["parameter"],
+                "value": content["value"],
+                "origin": self.channel_name,
+            },
+        )
+
+    # This method is called when a message is sent to the group
+    async def parameter_change(self, event):
+        await self.send(text_data=json.dumps({
+            "section": event["section"],
+            "parameter": event["parameter"],
+            "value": event["value"],
+        }))
