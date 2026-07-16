@@ -24,4 +24,5 @@ urlpatterns = [
     path('live/', views.LivePresentationView.as_view(), name='live'),
     path('parameters/<int:section_id>/', views.ParameterSetView.as_view(), name='parameters'),
     path('slides/interactive/', views.InteractiveSlidesView.as_view(), name='interactive-slides'),
+    path('slides/ipanels/', views.InteractivePanelsView.as_view(), name='interactive-panels')
 ]

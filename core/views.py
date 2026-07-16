@@ -952,3 +952,24 @@ class InteractiveSlidesView(View):
             'height': slide.height,
             'sections': [serialize_section(s) for s in slide.sections.all()],
         } for slide in interactive_slides], safe=False)
+
+class InteractivePanelsView(View): 
+    
+    def get(self, request):
+        
+        interactive_panels = Slide.objects.filter(
+            sections__view_type ='ipanel'
+        ).distinct().prefetch_related('sections__parameter_sets__parameters')
+        
+        return JsonResponse([{
+            'id': slide.id,
+            'name': slide.name,
+            'created_at': slide.created_at,
+            'updated_at': slide.updated_at,
+            'tags': slide.tag_list,
+            'width': slide.width,
+            'height': slide.height,
+            'sections': [serialize_section(s) for s in slide.sections.all()]
+        } for slide in interactive_panels], safe=False)
+        
+        
