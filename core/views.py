@@ -138,11 +138,11 @@ class MonitorView(View):
 
 class ParticipantView(View):
     def get(self, request):
-        participants = Participant.objects.all()
-        participant_list = [participant.name for participant in participants]
-        participants_data = [{"id": participant.id, "name": participant.name} for participant in participants]
+        participants_data = list(
+            Participant.objects.values("id", "name", "seat", "interactions")
+        )
         return JsonResponse({"participants": participants_data})
-
+    
     def post(self, request, *args, **kwargs):
         participant_name = request.POST.get("name")
         participant = Participant.objects.create(name=participant_name)
