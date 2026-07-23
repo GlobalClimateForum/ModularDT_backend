@@ -17,7 +17,7 @@ import json
 
 from dtbackend import settings
 
-from .models import Event, Group, Presentation, SceneInPresentationPosition, Slide, Scene, SlideSection, Settings, SlideInScenePosition, LivePresentation, Parameter, ParameterSet
+from .models import Event, Participant, Presentation, SceneInPresentationPosition, Slide, Scene, SlideSection, Settings, SlideInScenePosition, LivePresentation, Parameter, ParameterSet
 #import datetime
 
 def index(request):
@@ -136,18 +136,18 @@ class MonitorView(View):
         return JsonResponse({"status": "success", "message": "Monitor updated"})
 
 
-class GroupView(View):
+class ParticipantView(View):
     def get(self, request):
-        groups = Group.objects.all()
-        group_list = [group.name for group in groups]
-        groups_data = [{"id": group.id, "name": group.name} for group in groups]
-        return JsonResponse({"groups": groups_data})
+        participants = Participant.objects.all()
+        participant_list = [participant.name for participant in participants]
+        participants_data = [{"id": participant.id, "name": participant.name} for participant in participants]
+        return JsonResponse({"participants": participants_data})
 
     def post(self, request, *args, **kwargs):
-        group_name = request.POST.get("name")
-        group = Group.objects.create(name=group_name)
-        return HttpResponse(f"Group '{group_name}' created successfully.")
-    
+        participant_name = request.POST.get("name")
+        participant = Participant.objects.create(name=participant_name)
+        return HttpResponse(f"Participant '{participant_name}' created successfully.")
+
 @method_decorator(csrf_exempt, name='dispatch')
 class PresentationView(View): 
     

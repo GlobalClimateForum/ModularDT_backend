@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class LivePresentation(models.Model):
@@ -146,11 +147,20 @@ class Monitor(models.Model):
     name = models.CharField(max_length=255)
     aspect = models.CharField(max_length=10, choices=AspectRatio.choices, default=AspectRatio.RATIO_16_9)
     
-class Group(models.Model):
+class Participant(models.Model):
     name = models.CharField(max_length=255)
+    identifier = models.IntegerField(unique=True, validators=[MinValueValidator(1), MaxValueValidator(99)])
 
     def __str__(self):
         return self.name
+    
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(identifier__gte=1, identifier__lte=99),
+                name="identifier_range",
+            )
+        ]
     
 class Parameter(models.Model): 
     
