@@ -149,16 +149,22 @@ class Monitor(models.Model):
     
 class Participant(models.Model):
     name = models.CharField(max_length=255)
-    identifier = models.IntegerField(unique=True, validators=[MinValueValidator(1), MaxValueValidator(99)])
+    seat = models.PositiveSmallIntegerField(
+        unique=True,
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(1), MaxValueValidator(99)],
+    )
+    interactions = models.BooleanField(default=False)
 
     def __str__(self):
-        return self.name
-    
+        return f"{self.seat} – {self.name}"
+
     class Meta:
         constraints = [
             models.CheckConstraint(
-                check=models.Q(identifier__gte=1, identifier__lte=99),
-                name="identifier_range",
+                check=models.Q(seat__gte=1, seat__lte=99),
+                name="seat_range",
             )
         ]
     
