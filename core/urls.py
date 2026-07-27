@@ -9,6 +9,7 @@ urlpatterns = [
     path("event/<int:event_id>/authorize/", views.EventAuthorize.as_view(), name="event-authorize"),
     path('monitor/<int:monitor_id>/', views.MonitorView.as_view(), name='monitor'),
     path("participants/", views.ParticipantView.as_view(), name="participants"),
+    path("participants/<int:participant_id>/", views.ParticipantDetailView.as_view(), name="participant-detail"),
     path("slides/", views.SlideView.as_view(), name="slides"),
     path('slides/<int:slide_id>/', views.SlideDetailView.as_view(), name='slide-detail'),
     path('slides/<int:slide_id>/sections', views.SlideSectionView.as_view(), name='slide-sections'),

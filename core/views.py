@@ -135,7 +135,7 @@ class MonitorView(View):
         )
         return JsonResponse({"status": "success", "message": "Monitor updated"})
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class ParticipantView(View):
     def get(self, request):
         participants_data = list(
@@ -147,6 +147,19 @@ class ParticipantView(View):
         participant_name = request.POST.get("name")
         participant = Participant.objects.create(name=participant_name)
         return HttpResponse(f"Participant '{participant_name}' created successfully.")
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ParticipantDetailView(View): 
+    
+    def put(self, request, participant_id): 
+        participant = Participant.objects.get(id=participant_id)
+        data = json.loads(request.body)
+        
+        participant.name = data.get("name", participant.name)
+        participant.seat = data.get("seat", participant.seat)
+        participant.interactions = data.get("interactions", participant.interactions)
+        participant.save()
+        return JsonResponse({"status": "success", "message": "Participant updated"})
 
 @method_decorator(csrf_exempt, name='dispatch')
 class PresentationView(View): 
