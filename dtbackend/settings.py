@@ -41,7 +41,8 @@ INSTALLED_APPS = [
     'corsheaders', 
     'django_dbml',
     'channels',
-    'dtbackend'
+    'dtbackend',
+    'content'
 ]
 
 MIDDLEWARE = [
