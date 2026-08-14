@@ -134,12 +134,11 @@ class PresentationDetailView(View):
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON data', 'status': 'error'}, status=400)
 
-        # Transaktionsblock: Schützt die DB, falls eine scene_id ungültig ist
         with transaction.atomic():
-            # 1. Alle alten Verknüpfungen für diese Präsentation löschen
+            # delete old positions
             SceneInPresentationPosition.objects.filter(presentation=presentation).delete()
 
-            # 2. Neue Positionen vorbereiten und validieren
+            # new positions
             new_positions = []
             for item in scenes_data:
                 scene_id = item.get('scene_id')
@@ -161,12 +160,13 @@ class PresentationDetailView(View):
                     # Automatischer Rollback durch transaction.atomic()
                     return JsonResponse({'error': f'Scene with ID {scene_id} not found', 'status': 'error'}, status=400)
 
-            # 3. Bulk-Insert für maximale Performance
+            # Bulk-insert forr max performance
             SceneInPresentationPosition.objects.bulk_create(new_positions)
 
         # 4. Erfolgsantwort: Wir geben direkt das aktualisierte Objekt (wie im GET) zurück
         # Dazu holen wir die Präsentation frisch mit den neuen Verknüpfungen aus der DB
         updated_presentation = Presentation.objects.prefetch_related('scenes').get(id=presentation_id)
+        updated_presentation.save()
         
         return JsonResponse({
             'status': 'success',
@@ -329,9 +329,9 @@ class SceneView(View):
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
         
-        # expected JSON-Format for "as" im POST-Request:
-        # "as": [{"id": 1, "position": 1}, {"id": 2, "position": 3}, {"id": 2, "position": 4}]
-        slide_data_list = data.get("as", [])
+        # expected JSON-Format for "slide_positions" im POST-Request:
+        # "slide_positions": [{"id": 1, "position": 1}, {"id": 2, "position": 3}, {"id": 2, "position": 4}]
+        slide_data_list = data.get("slide_positions", [])
         
         scene = Scene.objects.create(
             name=data.get('name', 'Untitled Scene'),
@@ -406,8 +406,25 @@ class SceneDetailView(View):
         scene.name = data.get('name', scene.name)
         scene.tags = ', '.join(data.get('tags', scene.tag_list))
         scene.updated_at = timezone.now()
-        slide_ids = data.get("slides", scene.slides.values_list('id', flat=True))
-        scene.slides.set(Slide.objects.filter(id__in=slide_ids))
+        #slide_ids = data.get("slides", list(scene.slides.values_list('id', flat=True)))
+        slide_data_list = data.get("slide_positions", [])
+
+        SlideInScenePosition.objects.filter(scene=scene).delete()
+        
+        for item in slide_data_list:
+            slide_id = item.get("id")
+            position = item.get("position")
+            
+            if slide_id is not None and position is not None:
+                try:
+                    slide = Slide.objects.get(id=slide_id)
+                    SlideInScenePosition.objects.create(
+                        scene=scene, 
+                        slide=slide, 
+                        position=position
+                    )
+                except Slide.DoesNotExist:
+                    return JsonResponse({'error': f'Slide with id {slide_id} does not exist'}, status=400)
 
         try:
             scene.full_clean()
