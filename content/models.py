@@ -136,6 +136,7 @@ class SlideSection(models.Model):
         IMAGE = 'image', 'Image'
         VIDEO = 'video', 'Video'
         CHART = 'chart', 'Chart'
+        CUSTOM = 'custom', 'Custom'
 
     class SectionMode(models.TextChoices):
         STATIC = 'static', 'Static'
