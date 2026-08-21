@@ -142,8 +142,11 @@ class ParticipantView(View):
         return JsonResponse({"participants": participants_data})
     
     def post(self, request, *args, **kwargs):
-        participant_name = request.POST.get("name")
-        participant = Participant.objects.create(name=participant_name)
+        data = json.loads(request.body)
+        participant_name = data.get("name")
+        participant_seat = data.get("seat", None)
+        participant_interactions = data.get("interactions", 0)
+        participant = Participant.objects.create(name=participant_name, seat=participant_seat, interactions=participant_interactions)
         return HttpResponse(f"Participant '{participant_name}' created successfully.")
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -152,12 +155,16 @@ class ParticipantDetailView(View):
     def put(self, request, participant_id): 
         participant = Participant.objects.get(id=participant_id)
         data = json.loads(request.body)
-        
         participant.name = data.get("name", participant.name)
         participant.seat = data.get("seat", participant.seat)
         participant.interactions = data.get("interactions", participant.interactions)
         participant.save()
         return JsonResponse({"status": "success", "message": "Participant updated"})
+    
+    def delete(self, request, participant_id):
+        participant = Participant.objects.get(id=participant_id)
+        participant.delete()
+        return JsonResponse({"status": "success", "message": "Participant deleted"})
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SettingsView(View):
