@@ -194,6 +194,7 @@ class Layer(models.Model):
     
     name = models.CharField(max_length=255)
     filetype = models.CharField(max_length=20, choices=FileType.choices)
-    file = models.FileField(upload_to='layers/')
+    file = models.FileField(upload_to='local/maplayers/')
     marker = models.JSONField(null=True, blank=True)
     path = models.CharField(max_length=255, blank=True) 
+    
