@@ -270,6 +270,34 @@ class LivePresentationView(View):
                 'settings': model_to_dict(new_live_presentation)
             })
 
+@method_decorator(csrf_exempt, name='dispatch')
+class LiveSlidesView(View):
+ 
+    def patch(self, request):
+        return self._update(request)
+        
+    def _update(self, request):
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+        is_active = data.get('active', False)
+            
+        channel_layer = get_channel_layer()    
+        global_group_name = 'all_monitors'
+            
+        async_to_sync(channel_layer.group_send)(
+            global_group_name,
+                {
+                    'type': 'send_monitor_message', 
+                    'payload': {
+                        'event_type': 'live_slides_start' if is_active else 'live_slides_stop',
+                        'active': is_active
+                    }
+                }
+            )
+
 # -- 2. Scene View -- 
 @method_decorator(csrf_exempt, name='dispatch')
 class SceneView(View): 
