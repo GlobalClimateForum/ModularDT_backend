@@ -806,3 +806,45 @@ class ParameterSetView(View):
             'parameters': serialize_parameters(parameter_set),
         })
         
+@method_decorator(csrf_exempt, name='dispatch')
+class MapLayerDetailsView(View): 
+    
+    def get(self, request, layer_id): 
+        
+        try: 
+            layer = Layer.objects.get(id=layer_id)
+        except:
+            return JsonResponse({'error': 'Layer not found', 'status': 'error'}, status=404)
+        
+        return JsonResponse({
+            'id': layer.id,
+            'name': layer.name,
+            'filetype': layer.filetype,
+            'path': layer.path,
+            'marker': JSON.loads(layer.marker) if layer.marker else None,})
+        
+    def post(self, request):
+        uploaded_file = request.FILES.get('file')
+        
+        if uploaded_file is None:
+            return JsonResponse({'error': 'No file provided', 'status': 'error'}, status=400)
+
+        name = request.POST.get('name') or uploaded_file.name
+        marker = request.POST.get('marker')
+        
+        filetype = ('geojson' if name.endswith('.geojson')
+                    else 'gpkg' if name.endswith('.gpkg')
+                    else 'unknown')
+
+        layer = Layer.objects.create(name=name, filetype=filetype, marker=marker)
+        layer.file.save(name, uploaded_file)
+        layer.path = layer.file.url
+        layer.save()
+        
+        return JsonResponse({
+            'message': 'Layer created successfully',
+            'status': 'success',
+            'layer_id': layer.id,
+            'path': layer.path,
+            'filetype': layer.filetype,
+        })
