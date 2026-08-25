@@ -184,3 +184,16 @@ class Parameter(models.Model):
 
     class Meta:
         db_table = 'core_parameter'
+        
+# -- 8. Maps --
+class Layer(models.Model):
+    
+    class FileType(models.TextChoices):
+        GEOJSON = 'geojson', 'GeoJSON'
+        GPKG = 'gpkg', 'GPKG'
+    
+    name = models.CharField(max_length=255)
+    filetype = models.CharField(max_length=20, choices=FileType.choices)
+    file = models.FileField(upload_to='layers/')
+    marker = models.JSONField(null=True, blank=True)
+    path = models.CharField(max_length=255, blank=True) 
