@@ -42,7 +42,8 @@ INSTALLED_APPS = [
     'django_dbml',
     'channels',
     'dtbackend',
-    'content'
+    'content',
+    'django_cleanup.apps.CleanupConfig'
 ]
 
 MIDDLEWARE = [

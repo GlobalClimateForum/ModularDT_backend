@@ -606,7 +606,20 @@ class SlideView(View):
                 if parameters_bulk:
                     Parameter.objects.bulk_create(parameters_bulk)
 
-                return JsonResponse({'message': f'Slide "{slide.name}" created successfully.', 'slide_id': slide.id})
+                return JsonResponse({
+                    'message': f'Slide "{slide.name}" created successfully.',
+                    'slide_id': slide.id,
+                    'slide': {
+                        'id': slide.id,
+                        'name': slide.name,
+                        'created_at': slide.created_at,
+                        'updated_at': slide.updated_at,
+                        'width': slide.width,
+                        'height': slide.height,
+                        'tags': slide.tag_list,
+                        'sections': [serialize_section(s) for s in section_objects],
+                    }
+}, status=201)
 
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
@@ -831,12 +844,19 @@ class MapLayerDetailsView(View):
 
         name = request.POST.get('name') or uploaded_file.name
         marker = request.POST.get('marker')
+        # section = request.POST.get('section')
+        section_id = request.POST.get('section_id')
+        try: 
+            section = SlideSection.objects.get(id=section_id)
+        except SlideSection.DoesNotExist:
+            return JsonResponse({'error': 'SlideSection not found', 'status': 'error'}, status=404)
         
+  
         filetype = ('geojson' if name.endswith('.geojson')
                     else 'gpkg' if name.endswith('.gpkg')
                     else 'unknown')
 
-        layer = Layer.objects.create(name=name, filetype=filetype, marker=marker)
+        layer = Layer.objects.create(name=name, filetype=filetype, marker=marker, section=section)
         layer.file.save(name, uploaded_file)
         layer.path = layer.file.url
         layer.save()
