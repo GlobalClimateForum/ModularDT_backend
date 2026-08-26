@@ -298,6 +298,10 @@ class LiveSlidesView(View):
                 }
             )
 
+        return JsonResponse({
+            'message': 'LiveSlides updated successfully.', 
+            })
+
 # -- 2. Scene View -- 
 @method_decorator(csrf_exempt, name='dispatch')
 class SceneView(View): 
