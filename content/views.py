@@ -892,7 +892,7 @@ class SlideshowView(View):
         for slideshow in slideshows:
 
             slide_list = []
-            for line in slide.slideinsceneposition_set.all():
+            for line in slideshow.slideinslideshowposition_set.all():
                 slide = line.slide  # Das eigentliche A-Objekt
             
                 # Sections vom verknüpften A-Objekt holen
@@ -919,7 +919,7 @@ class SlideshowView(View):
                 "slides": slide_list  
             })
 
-        return JsonResponse({"scenes": slideshow_list}, safe=False)
+        return JsonResponse({"slideshows": slideshow_list}, safe=False)
 
 
     def post(self, request, *args, **kwargs):
@@ -952,7 +952,7 @@ class SlideshowView(View):
                 except Slide.DoesNotExist:
                     return JsonResponse({'error': f'Slide with id {slide_id} does not exist'}, status=400)
 
-        return JsonResponse({"message": f"Slideshow '{slideshow.name}' created successfully.", "scene_id": slideshow.id})
+        return JsonResponse({"message": f"Slideshow '{slideshow.name}' created successfully.", "slideshow_id": slideshow.id})
 
 
 @method_decorator(csrf_exempt, name='dispatch')    
@@ -990,52 +990,72 @@ class SlideshowDetailView(View):
         return self._update(request, slideshow_id)
 
     def _update(self, request, slideshow_id):
-        
         try:
-            scene = Slideshow.objects.get(id=scene_id)
+            slideshow = Slideshow.objects.get(id=slideshow_id)
         except Slideshow.DoesNotExist:
             return JsonResponse({'error': 'Slideshow not found', 'status': 'error'}, status=404)
-        
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON', 'status': 'error'}, status=400)
-        
-        scene.name = data.get('name', scene.name)
-        scene.tags = ', '.join(data.get('tags', scene.tag_list))
-        scene.updated_at = timezone.now()
-        #slide_ids = data.get("slides", list(scene.slides.values_list('id', flat=True)))
-        slide_data_list = data.get("slide_positions", [])
 
-        SlideInSlideshowPosition.objects.filter(scene=scene).delete()
-        
-        for item in slide_data_list:
-            slide_id = item.get("id")
-            position = item.get("position")
-            
-            if slide_id is not None and position is not None:
+        try:
+            # JSON-Daten aus dem Vue-Frontend auslesen
+            data = json.loads(request.body)
+            slide_data = data.get("slide_positions", []) # Erwartet: [{"slide_id": "...", "position": 0}, ...]
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data', 'status': 'error'}, status=400)
+
+        with transaction.atomic():
+            # delete old positions
+            SlideInSlideshowPosition.objects.filter(slideshow=slideshow).delete()
+
+            # new positions
+            new_positions = []
+            for item in slide_data:
+                slide_id = item.get('slide_id')
+                position = item.get('position')
+
+                if slide_id is None or position is None:
+                    return JsonResponse({'error': 'Missing slide_id or position', 'status': 'error'}, status=400)
+
                 try:
                     slide = Slide.objects.get(id=slide_id)
-                    SlideInSlideshowPosition.objects.create(
-                        scene=scene, 
-                        slide=slide, 
-                        position=position
+                    new_positions.append(
+                        SlideInSlideshowPosition(
+                            slideshow=slideshow,
+                            slide=slide,
+                            position=position
+                        )
                     )
                 except Slide.DoesNotExist:
-                    return JsonResponse({'error': f'Slide with id {slide_id} does not exist'}, status=400)
+                    # Automatischer Rollback durch transaction.atomic()
+                    return JsonResponse({'error': f'Slide with ID {slide_id} not found', 'status': 'error'}, status=400)
 
+            # Bulk-insert forr max performance
+            SlideInSlideshowPosition.objects.bulk_create(new_positions)
+
+        # 4. Erfolgsantwort: Wir geben direkt das aktualisierte Objekt (wie im GET) zurück
+        # Dazu holen wir die Präsentation frisch mit den neuen Verknüpfungen aus der DB
+        updated_slideshow = Slideshow.objects.prefetch_related('slides').get(id=slideshow_id)
+        updated_slideshow.save()
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Order updated successfully',
+            'slideshow': {
+                'id': updated_slideshow.id,
+                'name': updated_slideshow.name,
+                'description': updated_slideshow.description,
+                'created_at': updated_slideshow.created_at,
+                'updated_at': updated_slideshow.updated_at,
+                'slides': [{
+                    'id': slide.id,
+                    'name': slide.name
+                } for slide in updated_slideshow.slides.all()]
+            }
+        }, status=200)
+
+    def delete(self, request, slideshow_id):
         try:
-            scene.full_clean()
-            scene.save()
-            return JsonResponse({'status': 'success', 'id': scene.id, 'name': scene.name, 'updated_at': scene.updated_at, 'created_at': scene.created_at, 'tags': scene.tags})
-       
-        except ValidationError as e:
-            return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
-        
-    def delete(self, request, scene_id):
-        try:
-            scene = Slideshow.objects.get(id=scene_id)
-            scene.delete()
+            slideshow = Slideshow.objects.get(id=slideshow_id)
+            slideshow.delete()
             return JsonResponse({'message': 'Slideshow deleted successfully', 'status': 'success'})
         except Slideshow.DoesNotExist:
             return JsonResponse({'error': 'Slideshow not found', 'status': 'error'}, status=404)

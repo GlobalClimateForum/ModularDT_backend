@@ -19,7 +19,7 @@ urlpatterns = [
 
     # Slideshow
     path('slideshows/', views.SlideshowView.as_view(), name='slideshows'),
-    path('slideshows/<int:slideshows_id>/', views.SlideshowDetailView.as_view(), name='slideshow-detail'),
+    path('slideshows/<int:slideshow_id>/', views.SlideshowDetailView.as_view(), name='slideshow-detail'),
 
     # Live
     path('livepresentation/', views.LivePresentationView.as_view(), name='livepresentation'),
