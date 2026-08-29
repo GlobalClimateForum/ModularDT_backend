@@ -17,6 +17,10 @@ urlpatterns = [
     path('presentations/', views.PresentationView.as_view(), name='presentations'),
     path('presentations/<int:presentation_id>/', views.PresentationDetailView.as_view(), name='presentation-detail'),
 
+    # Slideshow
+    path('slideshows/', views.SlideshowView.as_view(), name='slideshows'),
+    path('slideshows/<int:slideshows_id>/', views.SlideshowDetailView.as_view(), name='slideshow-detail'),
+
     # Live
     path('livepresentation/', views.LivePresentationView.as_view(), name='livepresentation'),
     path('liveslides/', views.LiveSlidesView.as_view(), name='liveslides'),

@@ -513,7 +513,6 @@ class SceneTagView(View):
             return JsonResponse({'error': 'Scene not found', 'status': 'error'}, status=404)
 
 # -- 3. Slide View --
-
 @method_decorator(csrf_exempt, name='dispatch')
 class SlideView(View):
    
@@ -872,3 +871,171 @@ class MapLayerDetailsView(View):
             'path': layer.path,
             'filetype': layer.filetype,
         })
+
+
+# -- 6. Slideshow View -- 
+@method_decorator(csrf_exempt, name='dispatch')
+class SlideshowView(View): 
+    
+    def get(self, request):
+        # Wir prefetchen die Zwischentabelle (sortiert nach Position) 
+        # und holen direkt die A-Objekte samt ihren Sections mit.
+        prefetch_through = Prefetch(
+            'slideinslideshowposition_set',
+            queryset=SlideInSlideshowPosition.objects.select_related('slide')
+                .prefetch_related('slide__sections__parameter_sets__parameters')
+        )
+        
+        slideshows = Slideshow.objects.prefetch_related(prefetch_through).all()
+
+        slideshow_list = []
+        for slideshow in slideshows:
+
+            slide_list = []
+            for line in slide.slideinsceneposition_set.all():
+                slide = line.slide  # Das eigentliche A-Objekt
+            
+                # Sections vom verknüpften A-Objekt holen
+                section_list = [serialize_section(s) for s in slide.sections.all()]
+            
+                slide_list.append({
+                    "id": slide.id,
+                    "name": slide.name,
+                    "created_at": slide.created_at,
+                    "updated_at": slide.updated_at,
+                    "width": slide.width,
+                    "height": slide.height,
+                    "tags": slide.tag_list,  
+                    "sections": section_list,
+                    "position": line.position 
+                })
+
+            slideshow_list.append({
+                "id": slideshow.id,
+                "name": slideshow.name,
+                "description": slideshow.description,
+                "updated_at": slideshow.updated_at,
+                "created_at": slideshow.created_at,
+                "slides": slide_list  
+            })
+
+        return JsonResponse({"scenes": slideshow_list}, safe=False)
+
+
+    def post(self, request, *args, **kwargs):
+        try: 
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        
+        # expected JSON-Format for "slide_positions" im POST-Request:
+        # "slide_positions": [{"id": 1, "position": 1}, {"id": 2, "position": 3}, {"id": 2, "position": 4}]
+        slide_data_list = data.get("slide_positions", [])
+        
+        slideshow = Slideshow.objects.create(
+            name=data.get('name', 'Untitled Slideshow'),
+            description=data.get('description', '')
+        )
+
+        for item in slide_data_list:
+            slide_id = item.get("id")
+            position = item.get("position")
+            
+            if slide_id is not None and position is not None:
+                try:
+                    slide = Slide.objects.get(id=slide_id)
+                    SlideInSlideshowPosition.objects.create(
+                        slideshow=slideshow, 
+                        slide=slide, 
+                        position=position
+                    )
+                except Slide.DoesNotExist:
+                    return JsonResponse({'error': f'Slide with id {slide_id} does not exist'}, status=400)
+
+        return JsonResponse({"message": f"Slideshow '{slideshow.name}' created successfully.", "scene_id": slideshow.id})
+
+
+@method_decorator(csrf_exempt, name='dispatch')    
+class SlideshowDetailView(View):
+            
+    def get(self, request, slideshow_id):
+        try:
+            slideshow = Slideshow.objects.prefetch_related('slides__sections__parameter_sets__parameters').get(id=slideshow_id)
+        except Slideshow.DoesNotExist:
+            return JsonResponse({'error': 'Slideshow not found', 'status': 'error'}, status=404)
+        
+        response_data = {
+            'id': slideshow.id,
+            'name': slideshow.name,
+            'created_at': slideshow.created_at,
+            'updated_at': slideshow.updated_at,
+            'tags': slideshow.tag_list,
+            'slides': [{
+                'id': slide.id,
+                'name': slide.name,
+                'created_at': slide.created_at,
+                'updated_at': slide.updated_at,
+                'width': slide.width,
+                'height': slide.height,
+                'tags': slide.tag_list,
+                'sections': [serialize_section(s) for s in slide.sections.all()],
+            } for slide in slideshow.slides.all()],
+        }
+        return JsonResponse(response_data)
+
+    def patch(self, request, slideshow_id):
+        return self._update(request, slideshow_id)
+        
+    def put(self, request, slideshow_id):
+        return self._update(request, slideshow_id)
+
+    def _update(self, request, slideshow_id):
+        
+        try:
+            scene = Slideshow.objects.get(id=scene_id)
+        except Slideshow.DoesNotExist:
+            return JsonResponse({'error': 'Slideshow not found', 'status': 'error'}, status=404)
+        
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON', 'status': 'error'}, status=400)
+        
+        scene.name = data.get('name', scene.name)
+        scene.tags = ', '.join(data.get('tags', scene.tag_list))
+        scene.updated_at = timezone.now()
+        #slide_ids = data.get("slides", list(scene.slides.values_list('id', flat=True)))
+        slide_data_list = data.get("slide_positions", [])
+
+        SlideInSlideshowPosition.objects.filter(scene=scene).delete()
+        
+        for item in slide_data_list:
+            slide_id = item.get("id")
+            position = item.get("position")
+            
+            if slide_id is not None and position is not None:
+                try:
+                    slide = Slide.objects.get(id=slide_id)
+                    SlideInSlideshowPosition.objects.create(
+                        scene=scene, 
+                        slide=slide, 
+                        position=position
+                    )
+                except Slide.DoesNotExist:
+                    return JsonResponse({'error': f'Slide with id {slide_id} does not exist'}, status=400)
+
+        try:
+            scene.full_clean()
+            scene.save()
+            return JsonResponse({'status': 'success', 'id': scene.id, 'name': scene.name, 'updated_at': scene.updated_at, 'created_at': scene.created_at, 'tags': scene.tags})
+       
+        except ValidationError as e:
+            return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
+        
+    def delete(self, request, scene_id):
+        try:
+            scene = Slideshow.objects.get(id=scene_id)
+            scene.delete()
+            return JsonResponse({'message': 'Slideshow deleted successfully', 'status': 'success'})
+        except Slideshow.DoesNotExist:
+            return JsonResponse({'error': 'Slideshow not found', 'status': 'error'}, status=404)

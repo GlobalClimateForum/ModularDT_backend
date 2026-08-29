@@ -197,4 +197,40 @@ class Layer(models.Model):
     file = models.FileField(upload_to='local/maplayers/')
     marker = models.JSONField(null=True, blank=True)
     path = models.CharField(max_length=255, blank=True) 
-    section = models.ForeignKey('SlideSection', related_name='layers', on_delete=models.CASCADE, null=False, blank=False)
+    section = models.ForeignKey('SlideSection', related_name='layers', on_delete=models.CASCADE, null=True, blank=True)
+
+
+# -- 9. Slideshow --
+
+class Slideshow(models.Model):
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    slides = models.ManyToManyField(
+        'Slide',
+        through='SlideInSlideshowPosition',
+        related_name='slideshows',
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'core_slideshow'
+
+    def __str__(self):
+        return self.name
+
+# -- 10. SlideInSlideshowPosition --
+
+class SlideInSlideshowPosition(models.Model):
+    slide = models.ForeignKey('Slide', on_delete=models.CASCADE)
+    slideshow = models.ForeignKey('Slideshow', on_delete=models.CASCADE)
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = 'core_slideinslideshowposition'
+        ordering = ['position']
+
+    def __str__(self):
+        return f"{self.slideshow.name} -> {self.slide.name} on Position {self.position}"
+

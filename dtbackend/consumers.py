@@ -34,6 +34,41 @@ class MonitorConsumer(AsyncWebsocketConsumer):
 
         # Und senden es als JSON direkt ans Vue-Frontend
         await self.send(text_data=json.dumps(payload))
+
+class ParticipantConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.participant_id = self.scope['url_route']['kwargs']['participant_id']
+        self.individual_group = f'participant_{self.participant_id}'
+        # global Group for all Monitors
+        self.global_group = 'all_participants'
+
+        await self.channel_layer.group_add(self.individual_group, self.channel_name)
+        await self.channel_layer.group_add(self.global_group, self.channel_name)
+
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        # Aus beiden Gruppen sauber austragen
+        await self.channel_layer.group_discard(self.individual_group, self.channel_name)
+        await self.channel_layer.group_discard(self.global_group, self.channel_name)
+
+
+    # Diese Methode wird aufgerufen, wenn eine Nachricht an die Gruppe gesendet wird
+    #async def send_monitor_message(self, event):
+    #    message = event['message']
+#
+#        # Nachricht als JSON an das Vue-Frontend senden
+#        await self.send(text_data=json.dumps({
+#            'message': message
+#        }))
+
+    async def send_participant_message(self, event):
+        # Wir holen das 'payload'-Objekt aus dem Event
+        payload = event['payload']
+
+        # Und senden es als JSON direkt ans Vue-Frontend
+        await self.send(text_data=json.dumps(payload))
+
         
 class ParameterConsumer(AsyncWebsocketConsumer):
     GROUP = "parameters"
