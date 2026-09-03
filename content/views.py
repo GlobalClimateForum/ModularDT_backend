@@ -1059,3 +1059,4 @@ class SlideshowDetailView(View):
             return JsonResponse({'message': 'Slideshow deleted successfully', 'status': 'success'})
         except Slideshow.DoesNotExist:
             return JsonResponse({'error': 'Slideshow not found', 'status': 'error'}, status=404)
+        

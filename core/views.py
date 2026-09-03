@@ -166,6 +166,23 @@ class ParticipantDetailView(View):
         participant.delete()
         return JsonResponse({"status": "success", "message": "Participant deleted"})
 
+    def patch(self, request, participant_id):
+        data = json.loads(request.body)
+
+        channel_layer = get_channel_layer()
+        group_name = f'participant_{participant_id}'
+        data = json.loads(request.body)
+    
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                'type': 'send_participant_message', 
+                'payload': data
+            }
+        )
+        return JsonResponse({"status": "success", "message": "Participant updated"})
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class SettingsView(View):
    
@@ -215,3 +232,22 @@ class SettingsView(View):
                 'message': 'Settings created successfully.', 
                 'settings': model_to_dict(new_settings)
             })
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ModeratorView(View): 
+
+    def patch(self, request):
+        data = json.loads(request.body)
+
+        channel_layer = get_channel_layer()
+        group_name = f'moderator'
+        data = json.loads(request.body)
+    
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                'type': 'send_moderator_message', 
+                'payload': data
+            }
+        )
+        return JsonResponse({"status": "success", "message": "Moderator updated"})
