@@ -35,5 +35,6 @@ urlpatterns = [
     path('tags/<str:tag_name>/scene/<int:scene_id>/', views.SceneTagView.as_view(), name='tag-scene-remove'),
     
     # Maps
-    path('maps/layers/', views.MapLayerDetailsView.as_view(), name='maps'),
+    path('maps/layers/', views.MapLayerView.as_view(), name='maps'),
+    path('maps/layers/<int:layer_id>/', views.MapLayerDetailsView.as_view(), name='maps'),
 ]

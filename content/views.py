@@ -823,6 +823,20 @@ class ParameterSetView(View):
         })
         
 @method_decorator(csrf_exempt, name='dispatch')
+class MapLayerView(View): 
+    
+    def get(self, request):
+        layers = Layer.objects.all()
+        
+        return JsonResponse([{
+            'id': layer.id,
+            'name': layer.name,
+            'filetype': layer.filetype,
+            'path': layer.path,
+            'marker': json.loads(layer.marker) if layer.marker else None,
+        } for layer in layers], safe=False)        
+        
+@method_decorator(csrf_exempt, name='dispatch')
 class MapLayerDetailsView(View): 
     
     def get(self, request, layer_id): 
