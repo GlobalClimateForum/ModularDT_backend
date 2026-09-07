@@ -666,7 +666,9 @@ class SlideDetailView(View):
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON', 'status': 'error'}, status=400)
-        
+
+        sections_data = data.get('sections', [])
+
         slide.name = data.get('name', slide.name)
         slide.tags = ', '.join(data.get('tags', slide.tag_list))
         slide.updated_at = timezone.now()
@@ -674,8 +676,40 @@ class SlideDetailView(View):
         try:
             slide.full_clean()
             slide.save()
-            return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 
-                                 'updated_at': slide.updated_at, 'created_at': slide.created_at, 'tags': slide.tags})
+
+            section_objects = []
+
+            for section_data in sections_data:
+                # Get the ID of the section to update
+                section_id = section_data.get('id')
+                if not section_id:
+                    continue  # Skip if it's a new object without an ID
+        
+                # Instantiate the model with the primary key (id) and updated data
+                section = SlideSection(
+                    id=section_id,
+                    slide=slide,
+                    view_type=section_data.get('view_type'),
+                    content=section_data.get('content'),
+                    content_path=section_data.get('content_path'),
+                    width_fraction=section_data.get('width_fraction', 1.0),
+                    mode=section_data.get('mode', ''),
+                    url_pattern=section_data.get('url_pattern', ''),
+                    properties=section_data.get('properties', {}),
+                )
+                section_objects.append(section)
+
+                # 2. Specify which fields you want to update in the database
+                fields_to_update = [
+                    'slide', 'view_type', 'content', 'content_path', 
+                    'width_fraction', 'mode', 'url_pattern', 'properties'
+                ]
+
+                # 3. Perform the bulk update
+                SlideSection.objects.bulk_update(section_objects, fields_to_update)
+
+                return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 
+                            'updated_at': slide.updated_at, 'created_at': slide.created_at, 'tags': slide.tags})
        
         except ValidationError as e:
             return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
