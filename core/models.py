@@ -10,7 +10,9 @@ class Settings(models.Model):
     language = models.CharField(max_length=255)
     theme = models.CharField(max_length=50, default='system')  # 'light', 'dark', or 'system'
     palette = models.CharField(max_length=50, default='indigo')  # e.g., 'indigo', 'blue', 'red', etc.
-
+    carto_api_key = models.CharField(max_length=255, blank=True, null=True)  # Optional Carto API key
+    avatar_style = models.CharField(max_length=50, default='glyphs')  # e.g., 'glyphs', 'avatars', etc. 
+    
 class Event(models.Model):
     eventID = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)

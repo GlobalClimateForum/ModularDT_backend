@@ -212,6 +212,8 @@ class SettingsView(View):
                 setting_item.language = data.get('language', setting_item.language)
                 setting_item.theme = data.get('theme', setting_item.theme)
                 setting_item.palette = data.get('palette', setting_item.palette)
+                setting_item.carto_api_key = data.get('carto_api_key', setting_item.carto_api_key)
+                setting_item.avatar_style = data.get('avatar_style', setting_item.avatar_style)
                 setting_item.save()
                 return JsonResponse({
                     'message': 'Settings updated successfully.', 
