@@ -8,6 +8,8 @@ class Settings(models.Model):
     number_of_screens = models.IntegerField(default=4)
     background_image = models.CharField(max_length=255)
     language = models.CharField(max_length=255)
+    theme = models.CharField(max_length=50, default='system')  # 'light', 'dark', or 'system'
+    palette = models.CharField(max_length=50, default='indigo')  # e.g., 'indigo', 'blue', 'red', etc.
 
 class Event(models.Model):
     eventID = models.AutoField(primary_key=True)
