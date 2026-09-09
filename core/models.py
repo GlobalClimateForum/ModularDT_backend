@@ -12,31 +12,36 @@ class Settings(models.Model):
     palette = models.CharField(max_length=50, default='indigo')  # e.g., 'indigo', 'blue', 'red', etc.
     carto_api_key = models.CharField(max_length=255, blank=True, null=True)  # Optional Carto API key
     avatar_style = models.CharField(max_length=50, default='glyphs')  # e.g., 'glyphs', 'avatars', etc. 
-    
-class Event(models.Model):
-    eventID = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=255)
-    description = models.TextField()
-    date = models.DateTimeField()
-    n_groups = models.IntegerField(default=3)
-    monitors = models.ManyToManyField('Monitor', related_name='events')
-    moderator_pin = models.CharField(max_length=128,  blank = True, null = True) # hashed pin for moderator access
-    
-    def nmonitors(self) -> int: 
-        return self.monitors.count()
+    event = models.ForeignKey('Event', on_delete=models.SET_NULL, null=True, blank=True)  # Optional link to an Event
+    dev_mode = models.BooleanField(default=False)  # Development mode toggle
+    moderator_pin = models.CharField(max_length=128,  blank = False, null = False) # hashed pin for moderator access
     
     def set_pin(self, raw_pin):
-        self.moderator_pin = make_password(raw_pin)
-        
+            self.moderator_pin = make_password(raw_pin)
+            self.save()
+            
     def check_pin(self, raw_pin):
         # If no pin is set, allow access
         if not self.moderator_pin:
             return True
         return check_password(raw_pin, self.moderator_pin)
     
+    def has_pin(self):
+        return bool(self.moderator_pin)
+    
     def reset_pin(self): 
         self.moderator_pin = None
         self.save()
+    
+class Event(models.Model):
+    eventID = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255)
+    description = models.TextField()
+    date = models.DateTimeField()
+    monitors = models.ManyToManyField('Monitor', related_name='events')
+    
+    def nmonitors(self) -> int: 
+        return self.monitors.count()
     
     def __str__(self): 
         return self.name

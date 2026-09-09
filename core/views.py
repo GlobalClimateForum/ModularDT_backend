@@ -31,28 +31,60 @@ class health_check(View):
             "message": "server is running smoothly",
             "timestamp": timezone.now().isoformat()
         })
-
+        
+@method_decorator(csrf_exempt, name='dispatch')
 class EventView(View):
 
     def get(self, request):
         events = Event.objects.all()
-        event_list = [event.name for event in events]
-        return HttpResponse(f"Events: {', '.join(event_list)}")
+        event_list = [
+            {
+                "id": event.eventID,
+                "name": event.name,
+                "description": event.description,
+                "date": event.date
+            }
+            for event in events
+        ]
+        return JsonResponse(event_list, safe=False)
 
     def post(self, request, *args, **kwargs):
-        event_name = request.POST.get("name")
-        event_description = request.POST.get("description", "")
-        event_date = request.POST.get("date") or timezone.now()
-        n_groups = int(request.POST.get("n_groups", 3))
+       
+        data = json.loads(request.body)
+        event_name = data.get("name", "Untitled Event")
+        event_description = data.get("description", "")
+        event_date = data.get("date") or timezone.now()
+        
+        event_id = data.get("id", None)
 
-        event = Event.objects.create(
-            name=event_name,
-            description=event_description,
-            date=event_date,
-            n_groups=n_groups,
-        )
+        if event_id is not None: 
+            self._update(request, event_id)
+        else:
+            event = Event.objects.create(
+                name=event_name,
+                description=event_description,
+                date=event_date,
+            )
         return HttpResponse(f"Event '{event_name}' created successfully.")
     
+    def _update(self, request, event_id):
+        
+        try:
+            event = Event.objects.get(eventID=event_id)
+       
+        except Event.DoesNotExist:
+            return JsonResponse({'error': 'Event not found'}, status=404)
+    
+            data = json.loads(request.body)
+            event.name = data.get("name", event.name)
+            event.description = data.get("description", event.description)
+            event.date = data.get("date", event.date)
+            event.save()
+            return JsonResponse({"status": "success", "message": "Event updated"})
+        
+        
+
+@method_decorator(csrf_exempt, name='dispatch')
 class EventDetailView(View):
     
     # Get details of a specific event, including its associated scenes
@@ -66,33 +98,45 @@ class EventDetailView(View):
             'name': event.name,
             'description': event.description,
             'date': event.date,
-            'n_groups': event.n_groups,
-            'n_monitor': event.nmonitors(),
-            'monitors': list(event.monitors.values('id', 'name'))
         })
 
-class EventAuthorize(View): 
+@method_decorator(csrf_exempt, name='dispatch')
+class Authorize(View): 
     
-    def post(self, request, event_id): 
-        
-        # Check if event exists
-        try:
-            event = Event.objects.get(eventID=event_id)
-        
-        except Event.DoesNotExist:
-            return JsonResponse({'error': 'Event not found'}, status=404)
-
-        # Get the pin from the request and check it against the event's moderator pin
-        pin = json.loads(request.body).get('pin', '')
-        if not event.moderator_pin:
-            return JsonResponse({'valid': True, 'message': 'No pin set'})
-        valid = event.check_pin(pin)
+    def get(self, request, pin):
+        valid = self._authorize(pin)
         return JsonResponse({'valid': valid, 'message': 'Pin valid' if valid else 'Invalid pin'})
+
+    def post(self, request): 
+        
+        data = json.loads(request.body)
+        old_pin = data.get('pin')
+        new_pin = data.get('new_pin')
+        
+        valid = (self._authorize(old_pin) and new_pin is not None) or (Settings.objects.first().has_pin() is False and new_pin is not None)
+       
+        if valid: 
+            settings = Settings.objects.first()
+            settings.set_pin(new_pin)
+            return JsonResponse({'success': True, 'message': 'Pin changed successfully'})
+        else:
+            return JsonResponse({'success': False, 'message': 'Invalid pin or new pin not provided'}, status=400)
+    
+    def _authorize(self, pin):
+        try:
+            settings = Settings.objects.first()
+        except Settings.DoesNotExist:
+            return False
+
+        if not settings.moderator_pin or settings.dev_mode:
+            return True
+
+        return settings.check_pin(pin)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class MonitorView(View):
     
-    def get(self, request, event_id):
+    def get(self, request, event_id):   
         try:
             event = Event.objects.get(eventID=event_id)
         except Event.DoesNotExist:
@@ -185,15 +229,26 @@ class ParticipantDetailView(View):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SettingsView(View):
-   
-    def get(self, request, *args, **kwargs):
-        settings = list(Settings.objects.all())       
-        settings_list= [settings[0]] if settings else []
-        return JsonResponse({
-            'message': 'Settings read successfully.', 
-            'settings': model_to_dict(settings_list[0]) if settings_list else None
-        })
 
+    def get(self, request, *args, **kwargs):
+        obj = Settings.objects.first()
+
+        if obj is None:
+            return JsonResponse({'message': 'No settings found.', 'settings': None}, status=404)
+
+        fields = [
+            'id', 'cs_url', 'number_of_screens', 'background_image',
+            'language', 'theme', 'palette', 'carto_api_key',
+            'avatar_style', 'event', 'dev_mode',
+        ]
+        settings_data = {f: getattr(obj, f) for f in fields}
+        settings_data['pin_set'] = obj.has_pin()   # <-- computed, not stored
+
+        return JsonResponse({
+            'message': 'Settings read successfully.',
+            'settings': settings_data,
+        })
+        
     def patch(self, request):
         return self._update(request)
         
@@ -214,6 +269,7 @@ class SettingsView(View):
                 setting_item.palette = data.get('palette', setting_item.palette)
                 setting_item.carto_api_key = data.get('carto_api_key', setting_item.carto_api_key)
                 setting_item.avatar_style = data.get('avatar_style', setting_item.avatar_style)
+                setting_item.dev_mode = data.get('dev_mode', setting_item.dev_mode)
                 setting_item.save()
                 return JsonResponse({
                     'message': 'Settings updated successfully.', 
@@ -230,6 +286,7 @@ class SettingsView(View):
                 cs_url = data.get('cs_url', 'http://default-content-server.com'),
                 number_of_screens = data.get('number_of_screens', 4),
                 background_image = data.get('background_image', ''),
+                dev_mode = data.get('dev_mode', False),
                 language = data.get('language', 'en')
             )
             return JsonResponse({
