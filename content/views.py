@@ -708,12 +708,12 @@ class SlideDetailView(View):
                 # 3. Perform the bulk update
                 SlideSection.objects.bulk_update(section_objects, fields_to_update)
 
-                return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 
-                            'updated_at': slide.updated_at, 'created_at': slide.created_at, 'tags': slide.tags})
+            return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 
+                        'updated_at': slide.updated_at, 'created_at': slide.created_at, 'tags': slide.tags})
        
         except ValidationError as e:
             return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
-        
+
     def delete(self, request, slide_id):
         try:
             slide = Slide.objects.get(id=slide_id)
@@ -1049,6 +1049,7 @@ class SlideshowDetailView(View):
             # JSON-Daten aus dem Vue-Frontend auslesen
             data = json.loads(request.body)
             slide_data = data.get("slide_positions", []) # Erwartet: [{"slide_id": "...", "position": 0}, ...]
+            slideshow_name = data.get("name", "")
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON data', 'status': 'error'}, status=400)
 
@@ -1084,6 +1085,7 @@ class SlideshowDetailView(View):
         # 4. Erfolgsantwort: Wir geben direkt das aktualisierte Objekt (wie im GET) zurück
         # Dazu holen wir die Präsentation frisch mit den neuen Verknüpfungen aus der DB
         updated_slideshow = Slideshow.objects.prefetch_related('slides').get(id=slideshow_id)
+        updated_slideshow.name = slideshow_name
         updated_slideshow.save()
 
         return JsonResponse({
