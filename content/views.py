@@ -868,24 +868,7 @@ class MapLayerView(View):
             'filetype': layer.filetype,
             'path': layer.path,
             'marker': json.loads(layer.marker) if layer.marker else None,
-        } for layer in layers], safe=False)        
-        
-@method_decorator(csrf_exempt, name='dispatch')
-class MapLayerDetailsView(View): 
-    
-    def get(self, request, layer_id): 
-        
-        try: 
-            layer = Layer.objects.get(id=layer_id)
-        except:
-            return JsonResponse({'error': 'Layer not found', 'status': 'error'}, status=404)
-        
-        return JsonResponse({
-            'id': layer.id,
-            'name': layer.name,
-            'filetype': layer.filetype,
-            'path': layer.path,
-            'marker': JSON.loads(layer.marker) if layer.marker else None,})
+        } for layer in layers], safe=False) 
         
     def post(self, request):
         uploaded_file = request.FILES.get('file')
@@ -918,7 +901,24 @@ class MapLayerDetailsView(View):
             'layer_id': layer.id,
             'path': layer.path,
             'filetype': layer.filetype,
-        })
+        })       
+        
+@method_decorator(csrf_exempt, name='dispatch')
+class MapLayerDetailsView(View): 
+    
+    def get(self, request, layer_id): 
+        
+        try: 
+            layer = Layer.objects.get(id=layer_id)
+        except:
+            return JsonResponse({'error': 'Layer not found', 'status': 'error'}, status=404)
+        
+        return JsonResponse({
+            'id': layer.id,
+            'name': layer.name,
+            'filetype': layer.filetype,
+            'path': layer.path,
+            'marker': JSON.loads(layer.marker) if layer.marker else None,})
 
 
 # -- 6. Slideshow View -- 

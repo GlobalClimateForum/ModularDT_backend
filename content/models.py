@@ -194,7 +194,7 @@ class Layer(models.Model):
     
     name = models.CharField(max_length=255)
     filetype = models.CharField(max_length=20, choices=FileType.choices)
-    file = models.FileField(upload_to='local/maplayers/')
+    file = models.FileField(upload_to='maplayers/')
     marker = models.JSONField(null=True, blank=True)
     path = models.CharField(max_length=255, blank=True) 
     section = models.ForeignKey('SlideSection', related_name='layers', on_delete=models.CASCADE, null=True, blank=True)
