@@ -110,8 +110,8 @@ class Authorize(View):
     def post(self, request): 
         
         data = json.loads(request.body)
-        old_pin = data.get('pin')
-        new_pin = data.get('new_pin')
+        old_pin = data.get('old_pin', None)
+        new_pin = data.get('new_pin', None)
         
         valid = (self._authorize(old_pin) and new_pin is not None) or (Settings.objects.first().has_pin() is False and new_pin is not None)
        
@@ -270,6 +270,7 @@ class SettingsView(View):
                 setting_item.carto_api_key = data.get('carto_api_key', setting_item.carto_api_key)
                 setting_item.avatar_style = data.get('avatar_style', setting_item.avatar_style)
                 setting_item.dev_mode = data.get('dev_mode', setting_item.dev_mode)
+                setting_item.pin_length = data.get('pin_length', setting_item.pin_length)
                 setting_item.save()
                 return JsonResponse({
                     'message': 'Settings updated successfully.', 

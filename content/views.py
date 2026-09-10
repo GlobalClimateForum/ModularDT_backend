@@ -871,6 +871,7 @@ class MapLayerView(View):
         } for layer in layers], safe=False) 
         
     def post(self, request):
+       
         uploaded_file = request.FILES.get('file')
         
         if uploaded_file is None:
@@ -885,14 +886,15 @@ class MapLayerView(View):
         except SlideSection.DoesNotExist:
             return JsonResponse({'error': 'SlideSection not found', 'status': 'error'}, status=404)
         
-  
         filetype = ('geojson' if name.endswith('.geojson')
                     else 'gpkg' if name.endswith('.gpkg')
                     else 'unknown')
-
-        layer = Layer.objects.create(name=name, filetype=filetype, marker=marker, section=section)
+        
+        vector_type = request.POST.get('vectorType')
+        layer = Layer.objects.create(name=name, filetype=filetype, marker=marker, section=section, vector_type=vector_type)
         layer.file.save(name, uploaded_file)
         layer.path = layer.file.url
+        
         layer.save()
         
         return JsonResponse({

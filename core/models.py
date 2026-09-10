@@ -15,6 +15,7 @@ class Settings(models.Model):
     event = models.ForeignKey('Event', on_delete=models.SET_NULL, null=True, blank=True)  # Optional link to an Event
     dev_mode = models.BooleanField(default=False)  # Development mode toggle
     moderator_pin = models.CharField(max_length=128,  blank = False, null = False) # hashed pin for moderator access
+    pin_length = models.PositiveIntegerField(default=4, validators=[MinValueValidator(4), MaxValueValidator(10)])  # Length of the pin
     
     def set_pin(self, raw_pin):
             self.moderator_pin = make_password(raw_pin)

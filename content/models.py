@@ -192,13 +192,19 @@ class Layer(models.Model):
         GEOJSON = 'geojson', 'GeoJSON'
         GPKG = 'gpkg', 'GPKG'
     
+    class VectorType(models.TextChoices):
+        POINT = 'point', 'Point'
+        LINE = 'line', 'Line'
+        POLYGON = 'polygon', 'Polygon'
+        UNKNOWN = 'unknown', 'Unknown'
+    
     name = models.CharField(max_length=255)
     filetype = models.CharField(max_length=20, choices=FileType.choices)
     file = models.FileField(upload_to='maplayers/')
     marker = models.JSONField(null=True, blank=True)
     path = models.CharField(max_length=255, blank=True) 
     section = models.ForeignKey('SlideSection', related_name='layers', on_delete=models.CASCADE, null=True, blank=True)
-
+    vector_type = models.CharField(choices=VectorType.choices, max_length=20, default=VectorType.UNKNOWN)
 
 # -- 9. Slideshow --
 
