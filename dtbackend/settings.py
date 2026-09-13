@@ -28,7 +28,7 @@ SECRET_KEY = 'django-insecure-=q$-s5(_)#59^)fm7p_#sv4blh1s4)et@z1&z!28@&v=s$clgh
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.15.41']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.15.41', '192.168.15.20']
 
 # Application definition
 
@@ -64,7 +64,12 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',  # Vite dev server
     'http://127.0.0.1:5173', 
     'http://localhost:8000',  # Django dev server
+<<<<<<< HEAD
     'http://192.168.15.41:5173'
+=======
+    'http://192.168.15.41:5173',
+    'http://192.168.15.20:5173'
+>>>>>>> 3e2f3199ab56f96a48e5fcea77f25175e851cd64
 ]
 
 CSRF_TRUSTED_ORIGINS = [
