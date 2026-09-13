@@ -64,12 +64,8 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',  # Vite dev server
     'http://127.0.0.1:5173', 
     'http://localhost:8000',  # Django dev server
-<<<<<<< HEAD
-    'http://192.168.15.41:5173'
-=======
     'http://192.168.15.41:5173',
     'http://192.168.15.20:5173'
->>>>>>> 3e2f3199ab56f96a48e5fcea77f25175e851cd64
 ]
 
 CSRF_TRUSTED_ORIGINS = [
