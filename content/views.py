@@ -214,18 +214,15 @@ class LivePresentationView(View):
 
     def patch(self, request):
         return self._update(request)
-        
+
     def _update(self, request):
-        live_presentation = LivePresentation.objects.first()
 
         try:
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
-        presentation_id = data.get('presentation')
-        is_active = data.get('active', False)
-        current_scene = data.get('current_scene', 1)
+        event_type = data.get('event_type','')
             
         channel_layer = get_channel_layer()    
         global_group_name = 'all_monitors'
@@ -235,40 +232,14 @@ class LivePresentationView(View):
                 {
                     'type': 'send_monitor_message', 
                     'payload': {
-                        'event_type': 'presentation_start' if is_active else 'presentation_stop',
-                        'presentation_id': presentation_id,
-                        'current_scene': current_scene,
-                        'active': is_active
+                        'event_type': event_type
                     }
                 }
             )
 
-        if live_presentation:
-            if 'presentation' in data:
-                live_presentation.presentation_id = data.get('presentation')
-            
-            live_presentation.active = data.get('active', live_presentation.active)
-            live_presentation.current_scene = data.get('current_scene', live_presentation.current_scene)
-            live_presentation.save()
-            
-            return JsonResponse({
-                'message': 'Live presentation updated successfully.', 
-                'settings': model_to_dict(live_presentation)
-            })
-        else:
-            presentation_id = data.get('presentation')
-            if not presentation_id:
-                return JsonResponse({'error': 'presentation id is required to create'}, status=400)
-
-            new_live_presentation = LivePresentation.objects.create(
-                presentation_id=presentation_id,
-                active=data.get('active', False), 
-                current_scene=data.get('current_scene', 0) 
-            )
-            return JsonResponse({
-                'message': 'LivePresentation created successfully.', 
-                'settings': model_to_dict(new_live_presentation)
-            })
+        return JsonResponse({
+                'message': 'LivePresentation created successfully.'
+        })
 
 @method_decorator(csrf_exempt, name='dispatch')
 class LiveSlidesView(View):
@@ -708,12 +679,12 @@ class SlideDetailView(View):
                 # 3. Perform the bulk update
                 SlideSection.objects.bulk_update(section_objects, fields_to_update)
 
-                return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 
-                            'updated_at': slide.updated_at, 'created_at': slide.created_at, 'tags': slide.tags})
+            return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 
+                        'updated_at': slide.updated_at, 'created_at': slide.created_at, 'tags': slide.tags})
        
         except ValidationError as e:
             return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
-        
+
     def delete(self, request, slide_id):
         try:
             slide = Slide.objects.get(id=slide_id)
@@ -1049,6 +1020,7 @@ class SlideshowDetailView(View):
             # JSON-Daten aus dem Vue-Frontend auslesen
             data = json.loads(request.body)
             slide_data = data.get("slide_positions", []) # Erwartet: [{"slide_id": "...", "position": 0}, ...]
+            slideshow_name = data.get("name", "")
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON data', 'status': 'error'}, status=400)
 
@@ -1084,6 +1056,7 @@ class SlideshowDetailView(View):
         # 4. Erfolgsantwort: Wir geben direkt das aktualisierte Objekt (wie im GET) zurück
         # Dazu holen wir die Präsentation frisch mit den neuen Verknüpfungen aus der DB
         updated_slideshow = Slideshow.objects.prefetch_related('slides').get(id=slideshow_id)
+        updated_slideshow.name = slideshow_name
         updated_slideshow.save()
 
         return JsonResponse({

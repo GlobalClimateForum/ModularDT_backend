@@ -28,7 +28,8 @@ class Presentation(models.Model):
     class Meta:
         db_table = 'core_presentation'
 
-
+    # ToDo: kick out livepresentation of the database completely, just do socket communication
+    # its not used anymore
 class LivePresentation(models.Model):
     presentation = models.ForeignKey(
         'Presentation',
