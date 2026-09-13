@@ -4,7 +4,7 @@
   "description": "1. Python 3.14.4 required\r 2. Create a virtual environment `python -m venv .venv`\r 3. Activate the virtual environment: Linux/macOS `source .venv/bin/activate` on Windows  `.venv\\Scripts\\activate` or Windows PowerShell `.venv\\Scripts\\Activate`\r 4. Install required packages: `pip install -r requirements.txt`\r 5. Create the database and migrate it by running `python manage.py migrate` - should create db.sqlite3 file",
   "main": "index.js",
   "scripts": {
-    "dev" : "concurrently \"python manage.py runserver\" \"node marp-server/server.js\""
+    "dev" : "concurrently \"python manage.py runserver 0.0.0.0:8000\" \"node marp-server/server.js\""
   },
   "keywords": [],
   "author": "",
