@@ -58,7 +58,7 @@ class EventView(View):
         event_id = data.get("id", None)
 
         if event_id is not None: 
-            self._update(request, event_id)
+            return self._update(request, event_id)
         else:
             event = Event.objects.create(
                 name=event_name,
@@ -68,19 +68,17 @@ class EventView(View):
         return HttpResponse(f"Event '{event_name}' created successfully.")
     
     def _update(self, request, event_id):
-        
         try:
             event = Event.objects.get(eventID=event_id)
-       
         except Event.DoesNotExist:
             return JsonResponse({'error': 'Event not found'}, status=404)
-    
-            data = json.loads(request.body)
-            event.name = data.get("name", event.name)
-            event.description = data.get("description", event.description)
-            event.date = data.get("date", event.date)
-            event.save()
-            return JsonResponse({"status": "success", "message": "Event updated"})
+
+        data = json.loads(request.body)
+        event.name = data.get("name", event.name)
+        event.description = data.get("description", event.description)
+        event.date = data.get("date", event.date)
+        event.save()
+        return JsonResponse({"status": "success", "message": "Event updated"})
         
         
 
@@ -239,10 +237,11 @@ class SettingsView(View):
         fields = [
             'id', 'cs_url', 'number_of_screens', 'background_image',
             'language', 'theme', 'palette', 'carto_api_key',
-            'avatar_style', 'event', 'dev_mode',
-        ]
+            'avatar_style', 'dev_mode']
+
         settings_data = {f: getattr(obj, f) for f in fields}
-        settings_data['pin_set'] = obj.has_pin()   # <-- computed, not stored
+        settings_data['event_id'] = obj.event.eventID if obj.event else None
+        settings_data['pin_set'] = obj.has_pin()
 
         return JsonResponse({
             'message': 'Settings read successfully.',
@@ -255,11 +254,11 @@ class SettingsView(View):
     def _update(self, request):
         settings = list(Settings.objects.all())       
         settings_list = [settings[0]] if settings else []
-        print(settings_list) 
 
         if settings_list:
             try:
                 data = json.loads(request.body)
+                print(data)
                 setting_item = settings_list[0]
                 setting_item.cs_url = data.get('cs_url', setting_item.cs_url)
                 setting_item.number_of_screens = data.get('number_of_screens', setting_item.number_of_screens)
@@ -271,6 +270,15 @@ class SettingsView(View):
                 setting_item.avatar_style = data.get('avatar_style', setting_item.avatar_style)
                 setting_item.dev_mode = data.get('dev_mode', setting_item.dev_mode)
                 setting_item.pin_length = data.get('pin_length', setting_item.pin_length)
+                event_id = data.get('event_id', None)
+                if event_id:
+                    try:
+                        event_obj = Event.objects.get(eventID=event_id)
+                        setting_item.event = event_obj
+                    except Event.DoesNotExist:
+                        return JsonResponse({'error': 'Event not found'}, status=404)
+                else:
+                    setting_item.event = None
                 setting_item.save()
                 return JsonResponse({
                     'message': 'Settings updated successfully.', 
