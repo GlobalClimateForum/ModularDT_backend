@@ -11,7 +11,7 @@ from django.db import models
 # physical tables are untouched when these models are moved.
 
 
-# -- 1. Presentation & LivePresentation --
+# -- 1. Presentation --
 
 class Presentation(models.Model):
     name = models.CharField(max_length=255, unique=True)
@@ -27,24 +27,6 @@ class Presentation(models.Model):
 
     class Meta:
         db_table = 'core_presentation'
-
-    # ToDo: kick out livepresentation of the database completely, just do socket communication
-    # its not used anymore
-class LivePresentation(models.Model):
-    presentation = models.ForeignKey(
-        'Presentation',
-        related_name='live_presentation',
-        on_delete=models.CASCADE,
-    )
-    active = models.BooleanField(default=True)
-    current_scene = models.IntegerField(default=0)
-
-    class Meta:
-        db_table = 'core_livepresentation'
-
-    def __str__(self):
-        return f"{self.presentation.name} - {self.current_scene}"
-
 
 # -- 2. SceneInPresentationPosition --
 # Connects a Scene to a Presentation with an ordering position.
