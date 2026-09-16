@@ -155,6 +155,7 @@ class Parameter(models.Model):
         NUMBER = 'number', 'Number'
         BOOLEAN = 'boolean', 'Boolean'
         SELECT = 'select', 'Select'
+        LOCATION = 'location', 'Location'
 
     parameter_set = models.ForeignKey('ParameterSet', related_name='parameters', on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
@@ -164,6 +165,7 @@ class Parameter(models.Model):
     maximum = models.FloatField(null=True, blank=True)
     default = models.CharField(max_length=255, blank=True)
     options = models.JSONField(default=list, blank=True)
+    description = models.TextField(blank=True)
 
     class Meta:
         db_table = 'core_parameter'
