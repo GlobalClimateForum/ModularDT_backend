@@ -203,15 +203,6 @@ class PresentationDetailView(View):
 @method_decorator(csrf_exempt, name='dispatch')
 class LivePresentationView(View):
    
-    def get(self, request, *args, **kwargs):
-        live_presentation = list(LivePresentation.objects.all())       
-        live_presentation_list = [live_presentation[0]] if live_presentation else []
-        return JsonResponse({
-            'message': 'LivePresentation read successfully.', 
-            'live_presentation': model_to_dict(live_presentation_list[0]) if live_presentation_list else None
-        })
-    
-
     def patch(self, request):
         return self._update(request)
 
