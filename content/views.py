@@ -803,6 +803,51 @@ class InteractivePanelsView(View):
             'height': slide.height,
             'sections': [serialize_section(s) for s in slide.sections.all()]
         } for slide in interactive_panels], safe=False)
+        
+@method_decorator(csrf_exempt, name='dispatch')
+class ParameterSnapshotView(View):
+    
+    
+    
+    def get(self, request, section_id):
+        
+        try:
+            snapshots = ParameterSnapshot.objects.filter(section_id=section_id).select_related('creator', 'parameters')
+        except ParameterSnapshot.DoesNotExist:
+            return JsonResponse({'error': 'ParameterSnapshots not found for the provided Section ID', 'status': 'error'}, status=404)
+
+        return JsonResponse([{
+            'id': snapshot.id,
+            'name': snapshot.name,
+            'description': snapshot.description,
+            'created_at': snapshot.created_at,
+            'creator': {
+                'id': snapshot.creator.id if snapshot.creator else None,
+                'username': snapshot.creator.name if snapshot.creator else None
+            },
+            'parameters': serialize_parameters(snapshot.parameters) if snapshot.parameters else None
+        } for snapshot in snapshots], safe=False)
+        
+@method_decorator(csrf_exempt, name='dispatch')
+class ParameterSnapshotDetailView(View):
+    
+    def get(self, request, snapshot_id):
+        try:
+            snapshot = ParameterSnapshot.objects.select_related('creator', 'parameters').get(id=snapshot_id)
+        except ParameterSnapshot.DoesNotExist:
+            return JsonResponse({'error': 'ParameterSnapshot not found', 'status': 'error'}, status=404)
+
+        return JsonResponse({
+            'id': snapshot.id,
+            'name': snapshot.name,
+            'description': snapshot.description,
+            'created_at': snapshot.created_at,
+            'creator': {
+                'id': snapshot.creator.id if snapshot.creator else None,
+                'username': snapshot.creator.name if snapshot.creator else None
+            },
+            'parameters': serialize_parameters(snapshot.parameters) if snapshot.parameters else None
+        }, safe=False)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ParameterSetView(View):
@@ -816,7 +861,7 @@ class ParameterSetView(View):
         return JsonResponse({
             'section_id': section_id,
             'parameters': serialize_parameters(parameter_set),
-        })
+        })          
         
 @method_decorator(csrf_exempt, name='dispatch')
 class MapLayerView(View): 

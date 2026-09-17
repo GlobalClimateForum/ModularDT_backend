@@ -141,6 +141,14 @@ class SlideSection(models.Model):
 
 # -- 7. ParameterSet & Parameter --
 
+class ParameterSnapshot(models.Model): 
+    section = models.ForeignKey('SlideSection', related_name='parameter_snapshots', on_delete=models.CASCADE)
+    parameters = models.ForeignKey('ParameterSet', related_name='snapshots', on_delete=models.CASCADE)
+    # creator = models.ForeignKey('Participant', related_name='parameter_snapshots', on_delete=models.SET_NULL, null=True)
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
 class ParameterSet(models.Model):
     section = models.ForeignKey('SlideSection', related_name='parameter_sets', on_delete=models.CASCADE)
 
