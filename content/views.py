@@ -497,7 +497,7 @@ class SlideView(View):
                 'sections': [serialize_section(s) for s in slide.sections.all()]
             })
     
-        return JsonResponse(result, safe=False)
+        return JsonResponse(result, safe=False, status=200)
     
     def post(self, request, *args, **kwargs):
 
@@ -626,6 +626,7 @@ class SlideDetailView(View):
         
         try:
             data = json.loads(request.body)
+
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON', 'status': 'error'}, status=400)
 
@@ -670,8 +671,16 @@ class SlideDetailView(View):
                 # 3. Perform the bulk update
                 SlideSection.objects.bulk_update(section_objects, fields_to_update)
 
-            return JsonResponse({'status': 'success', 'id': slide.id, 'name': slide.name, 
-                        'updated_at': slide.updated_at, 'created_at': slide.created_at, 'tags': slide.tags})
+            return JsonResponse({'slide': {
+                        'id': slide.id,
+                        'name': slide.name,
+                        'created_at': slide.created_at,
+                        'updated_at': slide.updated_at,
+                        'width': slide.width,
+                        'height': slide.height,
+                        'tags': slide.tag_list,
+                        'sections': [serialize_section(s) for s in section_objects],
+                    }}, status=200)
        
         except ValidationError as e:
             return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
