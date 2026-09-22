@@ -692,6 +692,18 @@ class SlideDetailView(View):
             return JsonResponse({'message': 'Slide deleted successfully', 'status': 'success'})
         except Slide.DoesNotExist:
             return JsonResponse({'error': 'Slide not found', 'status': 'error'}, status=404)
+        
+@method_decorator(csrf_exempt, name='dispatch')
+class TagView(View): 
+    
+    def get(self, request):
+        # Get all unique tags from all slides
+        unique_tags = set()
+        for slide in Slide.objects.all():
+            tags = slide.tag_list
+            unique_tags.update(tags)
+
+        return JsonResponse({'tags': list(unique_tags)})
 
 @method_decorator(csrf_exempt, name='dispatch')        
 class SlideTagView(View): 

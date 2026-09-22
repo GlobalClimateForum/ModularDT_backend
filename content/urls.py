@@ -33,6 +33,7 @@ urlpatterns = [
     path('tags/<str:tag_name>/slide/<int:slide_id>/', views.SlideTagView.as_view(), name='tag-slide-remove'),
     path('tags/scenes/<str:tag_name>/', views.SceneTagView.as_view(), name='tag-scenes'),
     path('tags/<str:tag_name>/scene/<int:scene_id>/', views.SceneTagView.as_view(), name='tag-scene-remove'),
+    path('tags/available/', views.TagView.as_view(), name='available-tags'),
     
     # Maps
     path('maps/layers/', views.MapLayerView.as_view(), name='maps'),
