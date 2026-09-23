@@ -6,7 +6,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-function buildSizeTheme(width, height, baseTheme = "default") {
+function buildSizeTheme(width, height, bgColor, baseTheme = "default") {
   return `
           /* @theme sized */
           @import '${baseTheme}';
@@ -14,6 +14,7 @@ function buildSizeTheme(width, height, baseTheme = "default") {
           section {
             width: ${width}px !important;
             height: ${height}px !important;
+            background-color: ${bgColor} !important;
           }
             `;
 }
@@ -63,10 +64,12 @@ app.get("/.well-known/appspecific/com.chrome.devtools.json", (req, res) => {
 
 app.post("/render", (req, res) => {
   try {
-    const { content, width = 1280, height = 720, theme = "default" } = req.body;
+    const { content, width = 1280, height = 720, bgColor = 'white', theme = "default" } = req.body;
+    // ensure a leading # for the bgColor if it's a hex color
+    const normalizedBgColor = bgColor.startsWith('#') ? bgColor : `#${bgColor}`;
     const { content: updatedContent, basetheme } = injectSizeTheme(content);
     const marp = new Marp({ html: true, script: false });
-    marp.themeSet.add(buildSizeTheme(width, height, basetheme));
+    marp.themeSet.add(buildSizeTheme(width, height, normalizedBgColor, basetheme));
     const { html, css } = marp.render(updatedContent);
 
     const document = `<!DOCTYPE html>
