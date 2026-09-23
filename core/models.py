@@ -6,7 +6,11 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 class Settings(models.Model):
     cs_url = models.CharField(max_length=255)
     number_of_screens = models.IntegerField(default=4)
+    show_screen_id = models.BooleanField(default=False)
     background_image = models.CharField(max_length=255)
+    background_image_on_empty_screens = models.BooleanField(default=False)
+    background_image_on_welcome_screens = models.BooleanField(default=False)
+    background_image_on_all_slides_per_default = models.BooleanField(default=False)
     language = models.CharField(max_length=255)
     theme = models.CharField(max_length=50, default='system')  # 'light', 'dark', or 'system'
     palette = models.CharField(max_length=50, default='indigo')  # e.g., 'indigo', 'blue', 'red', etc.

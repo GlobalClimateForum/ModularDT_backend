@@ -235,9 +235,12 @@ class SettingsView(View):
             return JsonResponse({'message': 'No settings found.', 'settings': None}, status=404)
 
         fields = [
-            'id', 'cs_url', 'number_of_screens', 'background_image',
+            'id', 'cs_url', 'number_of_screens', 'show_screen_id', 'background_image',
+            'background_image_on_empty_screens', 'background_image_on_welcome_screens', 'background_image_on_all_slides_per_default', 
             'language', 'theme', 'palette', 'carto_api_key',
             'avatar_style', 'dev_mode']
+
+            
 
         settings_data = {f: getattr(obj, f) for f in fields}
         settings_data['event_id'] = obj.event.eventID if obj.event else None
@@ -262,7 +265,11 @@ class SettingsView(View):
                 setting_item = settings_list[0]
                 setting_item.cs_url = data.get('cs_url', setting_item.cs_url)
                 setting_item.number_of_screens = data.get('number_of_screens', setting_item.number_of_screens)
+                setting_item.show_screen_id = data.get('show_screen_id', setting_item.show_screen_id)
                 setting_item.background_image = data.get('background_image', setting_item.background_image)
+                setting_item.background_image_on_empty_screens = data.get('background_image_on_empty_screens', setting_item.background_image_on_empty_screens)
+                setting_item.background_image_on_welcome_screens = data.get('background_image_on_welcome_screens', setting_item.background_image_on_welcome_screens)
+                setting_item.background_image_on_all_slides_per_default = data.get('background_image_on_all_slides_per_default', setting_item.background_image_on_all_slides_per_default)
                 setting_item.language = data.get('language', setting_item.language)
                 setting_item.theme = data.get('theme', setting_item.theme)
                 setting_item.palette = data.get('palette', setting_item.palette)
