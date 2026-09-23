@@ -301,7 +301,11 @@ class SettingsView(View):
             new_settings = Settings.objects.create(
                 cs_url = data.get('cs_url', 'http://default-content-server.com'),
                 number_of_screens = data.get('number_of_screens', 4),
+                show_screen_id = data.get('show_screen_id', False),
                 background_image = data.get('background_image', ''),
+                background_image_on_empty_screens = data.get('background_image_on_empty_screens', True),
+                background_image_on_welcome_screens = data.get('background_image_on_welcome_screens', False),
+                background_image_on_all_slides_per_default = data.get('background_image_on_all_slides_per_default', True),
                 dev_mode = data.get('dev_mode', False),
                 language = data.get('language', 'en')
             )
