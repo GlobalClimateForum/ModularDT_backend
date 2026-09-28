@@ -19,6 +19,37 @@ from dtbackend import settings
 
 from .models import *
 
+# -- 0. Helper Functions --
+def build_parameters(pset, s_params):
+    params = []
+    for p_name, p_data in (s_params or {}).items():
+        p_type = p_data.get('type', 'string')
+        p_default = p_data.get('default')
+        if p_default is None:
+            p_default = "" if p_type in ['string', 'select'] else False if p_type == 'boolean' else 0
+        params.append(Parameter(
+            parameter_set=pset,
+            name=p_name,
+            description=p_data.get('description', ''),
+            ptype=p_type,
+            minimum=p_data.get('minimum'),
+            maximum=p_data.get('maximum'),
+            default=p_default,
+            options=p_data.get('options', []),
+        ))
+    return params
+
+def section_fields(section_data):
+    return dict(
+        view_type=section_data.get('view_type'),
+        content=section_data.get('content'),
+        content_path=section_data.get('content_path'),
+        width_fraction=section_data.get('width_fraction', 1.0),
+        mode=section_data.get('mode', ''),
+        url_pattern=section_data.get('url_pattern', ''),
+        properties=section_data.get('properties', {}),
+    )
+
 # -- 1. Presentation & LivePresentation --
 @method_decorator(csrf_exempt, name='dispatch')
 class PresentationView(View): 
@@ -543,29 +574,7 @@ class SlideView(View):
                 # Build parameters
                 parameters_bulk = []
                 for pset, section_data in zip(set_objects, sections_data):
-                    
-                    # Get the parameters for the section, if any
-                    s_params = section_data.get('parameters', {})
-                    
-                    # parameter name = key, parameter data = values
-                    for p_name, p_data in s_params.items():
-                        p_type = p_data.get('type', 'string')  # Get the parameter type - defaults to string
-                        p_default = p_data.get('default', None) # Get the default value for the parameter - defaults to None
-                        # If the default value is None, we set it to an appropriate default based on the parameter type
-                        if p_default is None:
-                            p_default = "" if p_type in ['string', 'select'] else False if p_type == 'boolean' else 0
-
-                        # Add the parameter to the bulk list for creation
-                        parameters_bulk.append(Parameter(
-                            parameter_set=pset,
-                            name=p_name,
-                            description=p_data.get('description', ''),
-                            ptype=p_type,
-                            minimum=p_data.get('minimum'),
-                            maximum=p_data.get('maximum'),
-                            default=p_default,
-                            options=p_data.get('options', []),
-                        ))
+                    parameters_bulk.extend(build_parameters(pset, section_data.get('parameters', {})))
 
                 # Create the parameters in bulk if there are any to create
                 if parameters_bulk:
@@ -616,17 +625,16 @@ class SlideDetailView(View):
         
     def put(self, request, slide_id):
         return self._update(request, slide_id)
-
+    
     def _update(self, request, slide_id):
         
         try:
             slide = Slide.objects.get(id=slide_id)
         except Slide.DoesNotExist:
             return JsonResponse({'error': 'Slide not found', 'status': 'error'}, status=404)
-        
+
         try:
             data = json.loads(request.body)
-
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON', 'status': 'error'}, status=400)
 
@@ -635,56 +643,62 @@ class SlideDetailView(View):
         slide.name = data.get('name', slide.name)
         slide.tags = ', '.join(data.get('tags', slide.tag_list))
         slide.updated_at = timezone.now()
-        
+
         try:
-            slide.full_clean()
-            slide.save()
+            with transaction.atomic():
+                slide.full_clean()
+                slide.save()
 
-            section_objects = []
+                # 1. Update existing sections in one query
+                keep_ids = []
+                section_objects = []
+                for section_data in sections_data:
+                    section_id = section_data.get('id')
+                    
+                    if not section_id: # If the section does not exist yet
+                        new_section = SlideSection.objects.create(slide=slide, **section_fields(section_data))
+                        pset = ParameterSet.objects.create(section=new_section)
+                        Parameter.objects.bulk_create(build_parameters(pset, section_data.get('parameters', {})))
+                        keep_ids.append(new_section.id)
+                        continue
+                    keep_ids.append(section_id)
+                    section_objects.append(SlideSection(id=section_id, slide=slide, **section_fields(section_data)))
 
-            for section_data in sections_data:
-                # Get the ID of the section to update
-                section_id = section_data.get('id')
-                if not section_id:
-                    continue  # Skip if it's a new object without an ID
-        
-                # Instantiate the model with the primary key (id) and updated data
-                section = SlideSection(
-                    id=section_id,
-                    slide=slide,
-                    view_type=section_data.get('view_type'),
-                    content=section_data.get('content'),
-                    content_path=section_data.get('content_path'),
-                    width_fraction=section_data.get('width_fraction', 1.0),
-                    mode=section_data.get('mode', ''),
-                    url_pattern=section_data.get('url_pattern', ''),
-                    properties=section_data.get('properties', {}),
-                )
-                section_objects.append(section)
+                if section_objects:
+                    SlideSection.objects.bulk_update(section_objects, [
+                        'slide', 'view_type', 'content', 'content_path',
+                        'width_fraction', 'mode', 'url_pattern', 'properties',
+                    ])
 
-                # 2. Specify which fields you want to update in the database
-                fields_to_update = [
-                    'slide', 'view_type', 'content', 'content_path', 
-                    'width_fraction', 'mode', 'url_pattern', 'properties'
-                ]
+                # 2. Replace parameters, only for sections that sent them
+                for section_data in sections_data:
+                    section_id = section_data.get('id')
+                    if not section_id or 'parameters' not in section_data:
+                        continue
+                    pset, _ = ParameterSet.objects.get_or_create(section_id=section_id)
+                    Parameter.objects.filter(parameter_set=pset).delete()
+                    Parameter.objects.bulk_create(build_parameters(pset, section_data['parameters']))
+            
+                if 'sections' in data:  # a PATCH without sections (e.g. rename only) must not wipe them
+                    SlideSection.objects.filter(slide=slide).exclude(id__in=keep_ids).delete()
 
-                # 3. Perform the bulk update
-                SlideSection.objects.bulk_update(section_objects, fields_to_update)
+            # 3. Reload so the response shows what's actually stored
+            sections = SlideSection.objects.filter(slide=slide).prefetch_related('parameter_sets__parameters')
 
             return JsonResponse({'slide': {
-                        'id': slide.id,
-                        'name': slide.name,
-                        'created_at': slide.created_at,
-                        'updated_at': slide.updated_at,
-                        'width': slide.width,
-                        'height': slide.height,
-                        'tags': slide.tag_list,
-                        'sections': [serialize_section(s) for s in section_objects],
-                    }}, status=200)
-       
+                'id': slide.id,
+                'name': slide.name,
+                'created_at': slide.created_at,
+                'updated_at': slide.updated_at,
+                'width': slide.width,
+                'height': slide.height,
+                'tags': slide.tag_list,
+                'sections': [serialize_section(s) for s in sections],
+            }}, status=200)
+
         except ValidationError as e:
             return JsonResponse({'error': e.message_dict, 'status': 'error'}, status=400)
-
+  
     def delete(self, request, slide_id):
         try:
             slide = Slide.objects.get(id=slide_id)
@@ -824,10 +838,9 @@ class InteractivePanelsView(View):
             'height': slide.height,
             'sections': [serialize_section(s) for s in slide.sections.all()]
         } for slide in interactive_panels], safe=False)
-        
+
 @method_decorator(csrf_exempt, name='dispatch')
 class ParameterSnapshotView(View):
-    
     
     
     def get(self, request, section_id):
