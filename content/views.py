@@ -827,9 +827,7 @@ class InteractivePanelsView(View):
         
 @method_decorator(csrf_exempt, name='dispatch')
 class ParameterSnapshotView(View):
-    
-    
-    
+
     def get(self, request, section_id):
         
         try:
@@ -872,6 +870,24 @@ class ParameterSnapshotDetailView(View):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ParameterSetView(View):
+    
+    def get(self, request):
+
+        parameter_sets = ParameterSet.objects.prefetch_related('parameters').all()
+
+        result = []
+        for parameter_set in parameter_sets: 
+            result.append({
+                'section_id': parameter_set.section_id,
+                'parameters': serialize_parameters(parameter_set),
+            })
+    
+        return JsonResponse(result, safe=False, status=200)
+ 
+    
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ParameterSetDetailView(View):
     
     def get(self, request, section_id):
         try:

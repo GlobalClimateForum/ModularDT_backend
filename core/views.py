@@ -134,6 +134,28 @@ class Authorize(View):
 @method_decorator(csrf_exempt, name='dispatch')
 class MonitorView(View):
     
+    def patch(self, request):
+        return self._update(request)
+         
+
+    def _update(self, request):
+        channel_layer = get_channel_layer()
+        group_name = 'all_monitors'
+        data = json.loads(request.body)
+    
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                'type': 'send_monitor_message', 
+                'payload': data.get('payload') 
+            }
+        )
+        return JsonResponse({"status": "success", "message": "Monitor updated"})
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class MonitorDetailView(View):
+    
     def get(self, request, event_id):   
         try:
             event = Event.objects.get(eventID=event_id)
@@ -150,16 +172,6 @@ class MonitorView(View):
     def patch(self, request, monitor_id):
         return self._update(request, monitor_id)
          
-    def post(self, request, monitor_id):
-        try:
-            self._update(request, monitor_id)
-            
-            return JsonResponse({
-                "status": "Erfolgreich", 
-                "monitor_id": monitor_id
-            })
-        except Exception as e:
-            return JsonResponse({"status": "Fehler", "error": str(e)}, status=400)
 
     def _update(self, request, monitor_id):
         channel_layer = get_channel_layer()
