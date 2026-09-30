@@ -26,7 +26,8 @@ urlpatterns = [
     path('liveslides/', views.LiveSlidesView.as_view(), name='liveslides'),
 
     # Parameters
-    path('parameters/<int:section_id>/', views.ParameterSetView.as_view(), name='parameters'),
+    path('parameters/', views.ParameterSetView.as_view(), name='parameters'),
+    path('parameters/<int:section_id>/', views.ParameterSetDetailView.as_view(), name='parameters'),
 
     # Tags
     path('tags/slides/<str:tag_name>/', views.SlideTagView.as_view(), name='tag-slides'),
