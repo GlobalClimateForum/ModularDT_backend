@@ -909,7 +909,9 @@ class MapLayerView(View):
             'filetype': layer.filetype,
             'path': layer.path,
             'marker': json.loads(layer.marker) if layer.marker else None,
+            'vectorType' : layer.vector_type
         } for layer in layers], safe=False) 
+        
         
     def post(self, request):
        
@@ -961,6 +963,7 @@ class MapLayerDetailsView(View):
             'name': layer.name,
             'filetype': layer.filetype,
             'path': layer.path,
+            'vectorType': layer.vector_type,
             'marker': JSON.loads(layer.marker) if layer.marker else None,})
 
 
