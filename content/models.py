@@ -137,6 +137,7 @@ class SlideSection(models.Model):
 
     class Meta:
         db_table = 'core_slidesection'
+        ordering = ['id']
 
 
 # -- 7. ParameterSet & Parameter --

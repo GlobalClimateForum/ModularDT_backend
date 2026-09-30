@@ -250,7 +250,7 @@ class SettingsView(View):
             'id', 'cs_url', 'number_of_screens', 'show_screen_id', 'background_image',
             'background_image_on_empty_screens', 'background_image_on_welcome_screens', 'background_image_on_all_slides_per_default', 
             'language', 'theme', 'palette', 'carto_api_key',
-            'avatar_style', 'dev_mode']
+            'avatar_style', 'dev_mode', 'pin_length']
 
             
 
