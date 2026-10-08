@@ -29,6 +29,7 @@ def serialize_parameters(pset):
     if pset:
         for p in pset.parameters.all():
             params[p.name] = {
+                'id': p.id,
                 'type': p.ptype,
                 'description': p.description,
                 'range': {'min': p.minimum, 'max': p.maximum} if p.ptype == 'number' else None,

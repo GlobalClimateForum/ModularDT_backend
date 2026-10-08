@@ -178,6 +178,26 @@ class Parameter(models.Model):
 
     class Meta:
         db_table = 'core_parameter'
+
+
+class GlobalParameter(models.Model):
+
+    class ParameterType(models.TextChoices):
+        STRING = 'string', 'String'
+        NUMBER = 'number', 'Number'
+        BOOLEAN = 'boolean', 'Boolean'
+        SELECT = 'select', 'Select'
+
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    ptype = models.CharField(max_length=20, choices=ParameterType.choices, default=ParameterType.STRING)
+    pvalues = models.JSONField(default=list, blank=True)
+    connect_all = models.BooleanField()
+    connected_slide_parameters = models.ManyToManyField("Parameter", related_name="my_parameters")
+
+    class Meta:
+        db_table = 'core_globalparameter'
+
         
 # -- 8. Maps --
 class Layer(models.Model):

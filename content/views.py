@@ -898,8 +898,6 @@ class ParameterSetView(View):
     
         return JsonResponse(result, safe=False, status=200)
  
-    
-
 @method_decorator(csrf_exempt, name='dispatch')
 class ParameterSetDetailView(View):
     
@@ -913,6 +911,54 @@ class ParameterSetDetailView(View):
             'section_id': section_id,
             'parameters': serialize_parameters(parameter_set),
         })          
+
+@method_decorator(csrf_exempt, name='dispatch')
+class GlobalParametersView(View):
+    
+    def get(self, request):
+
+        # we need this later
+        global_parameters = GlobalParameter.objects.prefetch_related('connected_slide_parameters').all()
+
+        result = []
+        for global_parameter in global_parameters: 
+            result.append({
+                 'name': global_parameter.name,
+                 'description': global_parameter.description,
+                 'ptype': global_parameter.ptype,
+                 'connect_all': global_parameter.connect_all,
+                 'pvalues': serialize_parameters(global_parameter.pvalues),
+                 "connected_slide_parameters": [connected_slide_parameter.id for connected_slide_parameter in global_parameters.connected_slide_parameters.all()],
+            })
+    
+        return JsonResponse(result, safe=False, status=200)
+
+    def post(self, request):
+
+        try:
+            data = json.loads(request.body)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        global_parameter_pvalues = data.get("pvalues", [])
+        if not isinstance(global_parameter_pvalues, list) or not all(
+            isinstance(value, str) for value in global_parameter_pvalues
+        ):
+            return JsonResponse({"error": "pvalues must be a list of strings"}, status=400)
+
+        global_parameter_description = data.get("description","")
+        global_parameter_pvalues = data.get("pvalues")
+
+        global_parameter_connected_slide_parameters = data.get("connected_slide_parameters", [])
+        if not isinstance(global_parameter_connected_slide_parameters, list):
+            return JsonResponse({"error": "'connected_slide_parameters' must be a list of slide parameter ids"}, status=400)
+
+        with transaction.atomic():
+            global_parameter = GlobalParameter.objects.create(name=data["name"], description=global_parameter_description, ptype=data["ptype"], pvalues=global_parameter_pvalues, connect_all=data["connect_all"])
+            global_parameter.set(global_parameter_connected_slide_parameters)
+        
+        return HttpResponse(f"GlobalParameter '{data["name"]}' created successfully.")
+
         
 @method_decorator(csrf_exempt, name='dispatch')
 class MapLayerView(View): 
