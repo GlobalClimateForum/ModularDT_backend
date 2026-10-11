@@ -923,12 +923,13 @@ class GlobalParametersView(View):
         result = []
         for global_parameter in global_parameters: 
             result.append({
+                 'id': global_parameter.id,
                  'name': global_parameter.name,
                  'description': global_parameter.description,
                  'ptype': global_parameter.ptype,
                  'connect_all': global_parameter.connect_all,
-                 'pvalues': serialize_parameters(global_parameter.pvalues),
-                 "connected_slide_parameters": [connected_slide_parameter.id for connected_slide_parameter in global_parameters.connected_slide_parameters.all()],
+                 'pvalues': global_parameter.pvalues,
+                 "connected_slide_parameters": [connected_slide_parameter.id for connected_slide_parameter in global_parameter.connected_slide_parameters.all()]
             })
     
         return JsonResponse(result, safe=False, status=200)
@@ -947,7 +948,6 @@ class GlobalParametersView(View):
             return JsonResponse({"error": "pvalues must be a list of strings"}, status=400)
 
         global_parameter_description = data.get("description","")
-        global_parameter_pvalues = data.get("pvalues")
 
         global_parameter_connected_slide_parameters = data.get("connected_slide_parameters", [])
         if not isinstance(global_parameter_connected_slide_parameters, list):
@@ -955,9 +955,45 @@ class GlobalParametersView(View):
 
         with transaction.atomic():
             global_parameter = GlobalParameter.objects.create(name=data["name"], description=global_parameter_description, ptype=data["ptype"], pvalues=global_parameter_pvalues, connect_all=data["connect_all"])
-            global_parameter.set(global_parameter_connected_slide_parameters)
+            global_parameter.connected_slide_parameters.set(global_parameter_connected_slide_parameters)
         
         return HttpResponse(f"GlobalParameter '{data["name"]}' created successfully.")
+
+    def delete(self, request):
+        GlobalParameter.objects.all().delete()
+        return JsonResponse({"response": "deleted all global parameters"}, status=200)
+
+
+@method_decorator(csrf_exempt, name='dispatch')    
+class GlobalParametersDetailView(View):
+            
+    def get(self, request, parameter_id):
+        return JsonResponse({'error': 'Not implemented'}, status=404)
+
+    def patch(self, request, parameter_id):
+        return self._update(request, parameter_id)
+        
+    def put(self, request, parameter_id):
+        return self._update(request, parameter_id)
+
+    def _update(self, request, parameter_id):
+        return JsonResponse({'error': 'Not implemented'}, status=404)
+    
+    def delete(self, request, parameter_id):
+        try:
+            globparam = GlobalParameter.objects.get(id=parameter_id)
+            globparam.delete()
+            return JsonResponse({
+                'status': 'success',
+                'message': f'Global parameter with ID {parameter_id} deleted successfully.'
+            }, status=200) 
+            
+        except GlobalParameter.DoesNotExist:
+            return JsonResponse({
+                'error': 'Global parameter not found', 
+                'status': 'error'
+            }, status=404)
+
 
         
 @method_decorator(csrf_exempt, name='dispatch')

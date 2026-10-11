@@ -31,7 +31,7 @@ urlpatterns = [
 
     # Parameters
     path('globalparameters/', views.GlobalParametersView.as_view(), name='globalparameters'),
-    #path('globalparameters/<int:section_id>/', views.GlobalParameterSetDetailView.as_view(), name='globalparameters-detail'),
+    path('globalparameters/<int:parameter_id>/', views.GlobalParametersDetailView.as_view(), name='globalparameters-detail'),
 
     # Tags
     path('tags/slides/<str:tag_name>/', views.SlideTagView.as_view(), name='tag-slides'),
