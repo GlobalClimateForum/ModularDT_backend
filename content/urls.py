@@ -8,6 +8,8 @@ urlpatterns = [
     path('slides/ipanels/', views.InteractivePanelsView.as_view(), name='interactive-panels'),
     path('slides/<int:slide_id>/', views.SlideDetailView.as_view(), name='slide-detail'),
     path('slides/<int:slide_id>/sections', views.SlideSectionView.as_view(), name='slide-sections'),
+    path('slides/filename/<str:name>/', views.SlideFilenameView.as_view(), name='slide-filename'),
+    path('slides/filename/<int:slide_id>/<str:name>/', views.SlideFilenameView.as_view(), name='slide-filename-update'),
 
     # Scenes
     path('scenes/', views.SceneView.as_view(), name='scenes'),

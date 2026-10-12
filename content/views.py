@@ -718,7 +718,23 @@ class TagView(View):
             unique_tags.update(tags)
 
         return JsonResponse({'tags': list(unique_tags)})
+    
+@method_decorator(csrf_exempt, name='dispatch')
+class SlideFilenameView(View):
 
+    def get(self, request, name):
+        name_exists = Slide.objects.filter(name=name).exists()
+        return JsonResponse({'exists': name_exists})
+    
+    def patch(self, request, slide_id, name):
+        try:
+            slide = Slide.objects.get(id=slide_id)
+            slide.name = name
+            slide.save()
+            return JsonResponse({'message': 'Slide renamed successfully', 'status': 'success'})
+        except Slide.DoesNotExist:
+            return JsonResponse({'error': 'Slide not found', 'status': 'error'}, status=404)
+    
 @method_decorator(csrf_exempt, name='dispatch')        
 class SlideTagView(View): 
     
