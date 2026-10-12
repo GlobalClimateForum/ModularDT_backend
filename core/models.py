@@ -4,6 +4,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class Settings(models.Model):
+    
     cs_url = models.CharField(max_length=255)
     number_of_screens = models.IntegerField(default=4)
     show_screen_id = models.BooleanField(default=False)
@@ -18,7 +19,7 @@ class Settings(models.Model):
     avatar_style = models.CharField(max_length=50, default='glyphs')  # e.g., 'glyphs', 'avatars', etc. 
     event = models.ForeignKey('Event', on_delete=models.SET_NULL, null=True, blank=True)  # Optional link to an Event
     dev_mode = models.BooleanField(default=False)  # Development mode toggle
-    moderator_pin = models.CharField(max_length=128,  blank = False, null = False) # hashed pin for moderator access
+    moderator_pin = models.CharField(max_length=128,  blank = False, null = False, default= make_password("1234")) # hashed pin for moderator access
     pin_length = models.PositiveIntegerField(default=4, validators=[MinValueValidator(4), MaxValueValidator(10)])  # Length of the pin
     
     def set_pin(self, raw_pin):
