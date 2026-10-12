@@ -18,16 +18,6 @@ class MonitorConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_discard(self.individual_group, self.channel_name)
         await self.channel_layer.group_discard(self.global_group, self.channel_name)
 
-
-    # Diese Methode wird aufgerufen, wenn eine Nachricht an die Gruppe gesendet wird
-    #async def send_monitor_message(self, event):
-    #    message = event['message']
-#
-#        # Nachricht als JSON an das Vue-Frontend senden
-#        await self.send(text_data=json.dumps({
-#            'message': message
-#        }))
-
     async def send_monitor_message(self, event):
         # Wir holen das 'payload'-Objekt aus dem Event
         payload = event['payload']
@@ -51,16 +41,6 @@ class ParticipantConsumer(AsyncWebsocketConsumer):
         # Aus beiden Gruppen sauber austragen
         await self.channel_layer.group_discard(self.individual_group, self.channel_name)
         await self.channel_layer.group_discard(self.global_group, self.channel_name)
-
-
-    # Diese Methode wird aufgerufen, wenn eine Nachricht an die Gruppe gesendet wird
-    #async def send_monitor_message(self, event):
-    #    message = event['message']
-#
-#        # Nachricht als JSON an das Vue-Frontend senden
-#        await self.send(text_data=json.dumps({
-#            'message': message
-#        }))
 
     async def send_participant_message(self, event):
         # Wir holen das 'payload'-Objekt aus dem Event
