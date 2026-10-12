@@ -994,7 +994,6 @@ class GlobalParametersDetailView(View):
                 'status': 'error'
             }, status=404)
 
-
         
 @method_decorator(csrf_exempt, name='dispatch')
 class MapLayerView(View): 
