@@ -97,6 +97,14 @@ class EventDetailView(View):
             'description': event.description,
             'date': event.date,
         })
+        
+    def delete(self, request, event_id):
+        try:
+            event = Event.objects.get(eventID=event_id)
+            event.delete()
+            return JsonResponse({"status": "success", "message": "Event deleted"})
+        except Event.DoesNotExist:
+            return JsonResponse({'error': 'Event not found'}, status=404)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class Authorize(View): 
@@ -273,7 +281,6 @@ class SettingsView(View):
         if settings_list:
             try:
                 data = json.loads(request.body)
-                print(data)
                 setting_item = settings_list[0]
                 setting_item.cs_url = data.get('cs_url', setting_item.cs_url)
                 setting_item.number_of_screens = data.get('number_of_screens', setting_item.number_of_screens)
