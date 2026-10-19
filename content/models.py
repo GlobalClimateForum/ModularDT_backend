@@ -189,6 +189,8 @@ class GlobalParameter(models.Model):
         SELECT = 'select', 'Select'
 
     name = models.CharField(max_length=255)
+    active = models.BooleanField(default=True)
+    current_value = models.CharField(max_length=510, default="")
     description = models.TextField(blank=True)
     ptype = models.CharField(max_length=20, choices=ParameterType.choices, default=ParameterType.STRING)
     pvalues = models.JSONField(default=list, blank=True)
