@@ -4,8 +4,10 @@ from . import views
 urlpatterns = [
     # Slides
     path('slides/', views.SlideView.as_view(), name='slides'),
-    path('slides/interactive/', views.InteractiveSlidesView.as_view(), name='interactive-slides'),
     path('slides/ipanels/', views.InteractivePanelsView.as_view(), name='interactive-panels'),
+    path('slides/ipanels/<int:slide_id>/', views.InteractivePanelsDetailView.as_view(), name='interactive-panels-detail'),
+    path('slides/interactive/', views.InteractiveSlidesView.as_view(), name='interactive-slides'),
+    path('slides/ipslides/', views.InteractiveSlidesView.as_view(), name='interactive-slides'),
     path('slides/<int:slide_id>/', views.SlideDetailView.as_view(), name='slide-detail'),
     path('slides/<int:slide_id>/sections', views.SlideSectionView.as_view(), name='slide-sections'),
     path('slides/filename/<str:name>/', views.SlideFilenameView.as_view(), name='slide-filename'),

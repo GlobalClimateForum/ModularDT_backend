@@ -836,13 +836,17 @@ class SlideSectionView(View):
         })
         
 # -- 5. Interactive Slides and Parameter ---
+
+# a small helper function to get all slides with sections of view_type 'ipanel'
+def ipanel_slides():
+    slides = Slide.objects.filter(sections__view_type ='ipanel').distinct().prefetch_related('sections__parameter_sets__parameters')
+    return slides
+
 class InteractivePanelsView(View): 
     
     def get(self, request):
         
-        interactive_panels = Slide.objects.filter(
-            sections__view_type ='ipanel'
-        ).distinct().prefetch_related('sections__parameter_sets__parameters')
+        interactive_panels = ipanel_slides()
         
         return JsonResponse([{
             'id': slide.id,
@@ -854,6 +858,39 @@ class InteractivePanelsView(View):
             'height': slide.height,
             'sections': [serialize_section(s) for s in slide.sections.all()]
         } for slide in interactive_panels], safe=False)
+        
+class InteractivePanelsDetailView(View): 
+    
+    def get(self, request, slide_id): 
+        
+        try:
+            ipslides = ipanel_slides().all() #  All slides with sections of view_type 'ipanel'
+            # Iterate all slides and check wether one of their sections 'interactive' has properties {"targetSlide: <slide_id>"}
+            ipanels = []
+            for slide in ipslides:
+                for section in slide.sections.filter(view_type='ipanel'): 
+                    
+                    section_content = None
+                    try: 
+                        section_content = json.loads(section.content)
+                        target_slide = int(section_content.get('targetSlide'))
+                        target_section = int(section_content.get('targetSection'))
+                    except:
+                        section_content = None
+                        target_slide = None
+                        target_section = None
+                    
+                    if section_content is not None and target_slide is not None and target_slide == slide_id: 
+                        ipanels.append({
+                            'slide_id': slide.id,
+                            'section_id': section.id,
+                            'target_slide_id': target_slide,
+                            'target_section_id': target_section
+                        })
+            return JsonResponse(ipanels, safe=False)
+        except: 
+            return JsonResponse({'error': f'Error fetching interactive panels for provided Slide {slide.id}', 'status': 'error'}, status=404)
+            
 
 @method_decorator(csrf_exempt, name='dispatch')
 class ParameterSnapshotView(View):
