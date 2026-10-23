@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
 from django.core.validators import MinValueValidator, MaxValueValidator
 
+def default_moderator_pin():
+    return make_password("1234")  # Default pin is "1234", hashed for security
 
 class Settings(models.Model):
     
@@ -19,7 +21,7 @@ class Settings(models.Model):
     avatar_style = models.CharField(max_length=50, default='glyphs')  # e.g., 'glyphs', 'avatars', etc. 
     event = models.ForeignKey('Event', on_delete=models.SET_NULL, null=True, blank=True)  # Optional link to an Event
     dev_mode = models.BooleanField(default=False)  # Development mode toggle
-    moderator_pin = models.CharField(max_length=128,  blank = False, null = False, default= make_password("1234")) # hashed pin for moderator access
+    moderator_pin = models.CharField(max_length=128,  blank = False, null = False, default= default_moderator_pin) # hashed pin for moderator access
     pin_length = models.PositiveIntegerField(default=4, validators=[MinValueValidator(4), MaxValueValidator(10)])  # Length of the pin
     
     def set_pin(self, raw_pin):
