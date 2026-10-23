@@ -37,8 +37,8 @@ class Settings(models.Model):
     def has_pin(self):
         return bool(self.moderator_pin)
     
-    def reset_pin(self): 
-        self.moderator_pin = None
+    def reset_pin(self):
+        self.moderator_pin = default_moderator_pin()
         self.save()
     
 class Event(models.Model):
