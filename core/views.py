@@ -211,6 +211,24 @@ class ParticipantView(View):
         participant = Participant.objects.create(name=participant_name, seat=participant_seat, interactions=participant_interactions)
         return HttpResponse(f"Participant '{participant_name}' created successfully.")
 
+    def patch(self, request):
+        data = json.loads(request.body)
+
+        channel_layer = get_channel_layer()
+        group_name = 'all_participants'
+        data = json.loads(request.body)
+    
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                'type': 'send_participant_message', 
+                'payload': data
+            }
+        )
+        return JsonResponse({"status": "success", "message": "Participant updated"})
+
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class ParticipantDetailView(View): 
     
