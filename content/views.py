@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from .serialize import serialize_section, serialize_parameters
+from .serialize import serialize_section, serialize_parameters, serialize_parameters_json
 from django.shortcuts import render
 from django.http import HttpResponse
 from django.views import View
@@ -1081,6 +1081,15 @@ class GlobalParametersDetailView(View):
                 'status': 'error'
             }, status=404)
 
+@method_decorator(csrf_exempt, name='dispatch')
+class ParameterJSONView(View): 
+    
+    def get(self, request):
+        global_params = GlobalParameter.objects.all()
+        default_params = ParameterSet.objects.all()
+        serialized_params = serialize_parameters_json(global_params, default_params)
+        return JsonResponse(serialized_params, safe=False)
+        
         
 @method_decorator(csrf_exempt, name='dispatch')
 class MapLayerView(View): 

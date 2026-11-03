@@ -32,6 +32,7 @@ urlpatterns = [
     # Parameters
     path('parameters/', views.ParameterSetView.as_view(), name='parameters'),
     path('parameters/<int:section_id>/', views.ParameterSetDetailView.as_view(), name='parameters-detail'),
+    path('parameters/json/', views.ParameterJSONView.as_view(), name='parameters-json'),
 
     # Parameters
     path('globalparameters/', views.GlobalParametersView.as_view(), name='globalparameters'),

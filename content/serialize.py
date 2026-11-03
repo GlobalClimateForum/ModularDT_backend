@@ -37,4 +37,36 @@ def serialize_parameters(pset):
                 'options': p.options,
             }
     return params
+
+def serialize_parameters_json(global_params, default_params):
+    """Serialize all parameters into a JSON-serializable format."""
+    
+    print(global_params)
+    print(default_params)
+    
+    global_ = []
+    defaults_ = []
+    
+    for pset in default_params:
         
+        p_ = serialize_parameters(pset) if pset else None
+        if p_ is not None:
+            defaults_.append(p_)
+    
+    for gp in global_params:
+        global_.append({
+            'name' : gp.name,
+            'current_value' : gp.current_value,
+            'description' : gp.description,
+            'ptype' : gp.ptype,
+        })
+        
+
+        
+    params = {
+        "participants": {},
+        "global" : global_,
+        "slide-specific" : defaults_
+    }
+
+    return params
