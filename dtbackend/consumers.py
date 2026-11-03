@@ -88,6 +88,8 @@ class ParameterConsumer(AsyncWebsocketConsumer):
                 "type": "parameter.change",
                 "section": content["section"],
                 "parameter": content["parameter"],
+                "participantSeat": content.get("participantSeat"),
+                "participantName": content.get("participantName"),
                 "value": content["value"],
                 "origin": self.channel_name,
             },
@@ -95,8 +97,12 @@ class ParameterConsumer(AsyncWebsocketConsumer):
 
     # This method is called when a message is sent to the group
     async def parameter_change(self, event):
+        if event.get("origin") == self.channel_name:
+            return  # Don't send the message back to the sender
         await self.send(text_data=json.dumps({
             "section": event["section"],
             "parameter": event["parameter"],
+            "participantSeat": event.get("participantSeat"),
+            "participantName": event.get("participantName"),
             "value": event["value"],
         }))
