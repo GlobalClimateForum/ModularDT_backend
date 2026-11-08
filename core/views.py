@@ -18,7 +18,6 @@ import json
 from dtbackend import settings
 from .models import Event, Participant, Settings, Monitor
 
-#import datetime
 
 def index(request):
     return HttpResponse("Hello, welcome to the Decision Theater backend server.")
@@ -155,7 +154,7 @@ class MonitorView(View):
             group_name,
             {
                 'type': 'send_monitor_message', 
-                'payload': data.get('payload') 
+                'payload': data
             }
         )
         return JsonResponse({"status": "success", "message": "Monitor updated"})
@@ -190,7 +189,7 @@ class MonitorDetailView(View):
             group_name,
             {
                 'type': 'send_monitor_message', 
-                'payload': data.get('payload') 
+                'payload': data
             }
         )
         return JsonResponse({"status": "success", "message": "Monitor updated"})
