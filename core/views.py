@@ -272,12 +272,10 @@ class SettingsView(View):
             return JsonResponse({'message': 'No settings found.', 'settings': None}, status=404)
 
         fields = [
-            'id', 'cs_url', 'number_of_screens', 'show_screen_id', 'background_image',
-            'background_image_on_empty_screens', 'background_image_on_welcome_screens', 'background_image_on_all_slides_per_default', 
+            'id', 'cs_url', 'number_of_screens', 'show_screen_id', 'background_monitor_slide',
+            'background_monitor_slide_on_welcome_screens', 'background_participant_slide', 'background_participant_slide_on_welcome_screens',
             'language', 'theme', 'palette', 'carto_api_key',
             'avatar_style', 'dev_mode', 'pin_length']
-
-            
 
         settings_data = {f: getattr(obj, f) for f in fields}
         settings_data['event_id'] = obj.event.eventID if obj.event else None
@@ -302,10 +300,10 @@ class SettingsView(View):
                 setting_item.cs_url = data.get('cs_url', setting_item.cs_url)
                 setting_item.number_of_screens = data.get('number_of_screens', setting_item.number_of_screens)
                 setting_item.show_screen_id = data.get('show_screen_id', setting_item.show_screen_id)
-                setting_item.background_image = data.get('background_image', setting_item.background_image)
-                setting_item.background_image_on_empty_screens = data.get('background_image_on_empty_screens', setting_item.background_image_on_empty_screens)
-                setting_item.background_image_on_welcome_screens = data.get('background_image_on_welcome_screens', setting_item.background_image_on_welcome_screens)
-                setting_item.background_image_on_all_slides_per_default = data.get('background_image_on_all_slides_per_default', setting_item.background_image_on_all_slides_per_default)
+                setting_item.background_monitor_slide = data.get('background_monitor_slide', setting_item.background_monitor_slide)
+                setting_item.background_monitor_slide_on_welcome_screens = data.get('background_monitor_slide_on_welcome_screens', setting_item.background_monitor_slide_on_welcome_screens)
+                setting_item.background_participant_slide = data.get('background_participant_slide', setting_item.background_participant_slide)
+                setting_item.background_participant_slide_on_welcome_screens = data.get('background_participant_slide_on_welcome_screens', setting_item.background_participant_slide_on_welcome_screens)
                 setting_item.language = data.get('language', setting_item.language)
                 setting_item.theme = data.get('theme', setting_item.theme)
                 setting_item.palette = data.get('palette', setting_item.palette)
@@ -338,12 +336,12 @@ class SettingsView(View):
                 cs_url = data.get('cs_url', 'http://default-content-server.com'),
                 number_of_screens = data.get('number_of_screens', 4),
                 show_screen_id = data.get('show_screen_id', False),
-                background_image = data.get('background_image', ''),
-                background_image_on_empty_screens = data.get('background_image_on_empty_screens', True),
-                background_image_on_welcome_screens = data.get('background_image_on_welcome_screens', False),
-                background_image_on_all_slides_per_default = data.get('background_image_on_all_slides_per_default', True),
-                dev_mode = data.get('dev_mode', False),
-                language = data.get('language', 'en')
+                background_monitor_slide = data.get('background_monitor_slide', -1),
+                background_monitor_slide_on_welcome_screens = data.get('background_monitor_slide_on_welcome_screens', False),
+                background_participant_slide = data.get('background_participant_slide', -1),
+                background_participant_slide_on_welcome_screens = data.get('background_participant_slide_on_welcome_screens', False),
+                language = data.get('language', 'en'),
+                dev_mode = data.get('dev_mode', False)
             )
             return JsonResponse({
                 'message': 'Settings created successfully.', 

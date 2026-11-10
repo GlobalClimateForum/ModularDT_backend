@@ -379,7 +379,7 @@ class SceneView(View):
                 except Slide.DoesNotExist:
                     return JsonResponse({'error': f'Slide with id {slide_id} does not exist'}, status=400)
 
-        return JsonResponse({"message": f"Scene '{scene.name}' created successfully.", "scene_id": scene.id})
+        return JsonResponse({"message": f"Scene '{scene.name}' created successfully.", "id": scene.id})
 
 
 @method_decorator(csrf_exempt, name='dispatch')    
