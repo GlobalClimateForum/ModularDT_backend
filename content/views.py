@@ -407,6 +407,10 @@ class SceneDetailView(View):
                 'tags': slide.tag_list,
                 'sections': [serialize_section(s) for s in slide.sections.all()],
             } for slide in scene.slides.all()],
+            'slide_positions': [{
+                'id': sip.slide.id,
+                'position': sip.position
+            } for sip in scene.slideinsceneposition_set.all().order_by('position')]
         }
         return JsonResponse(response_data)
 
