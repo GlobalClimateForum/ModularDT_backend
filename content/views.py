@@ -295,58 +295,57 @@ class LiveSlidesView(View):
             'message': 'LiveSlides updated successfully.', 
             })
 
+# Scene helpers
+def get_slide_positions_prefetch():
+    return Prefetch(
+        'slideinsceneposition_set',
+        queryset=SlideInScenePosition.objects.select_related('slide')
+            .prefetch_related('slide__sections__parameter_sets__parameters')
+            .order_by('position'),
+    )
+
+
+def serialize_scene(scene):
+    # Tags splitten
+    raw_tags = scene.tags or ''
+    tag_list = [t.strip() for t in raw_tags.split(',') if t.strip()]
+
+    slide_list = []
+    for line in scene.slideinsceneposition_set.all():
+        slide = line.slide
+        slide_list.append({
+            "id": slide.id,
+            "name": slide.name,
+            "created_at": slide.created_at,
+            "updated_at": slide.updated_at,
+            "width": slide.width,
+            "height": slide.height,
+            "tags": slide.tag_list,
+            "sections": [serialize_section(s) for s in slide.sections.all()],
+            "position": line.position,
+        })
+
+    return {
+        "id": scene.id,
+        "name": scene.name,
+        "description": scene.description,
+        "updated_at": scene.updated_at,
+        "created_at": scene.created_at,
+        "tags": tag_list,
+        "slides": slide_list,
+    }
+
+
 # -- 2. Scene View -- 
 @method_decorator(csrf_exempt, name='dispatch')
 class SceneView(View): 
-    
+
     def get(self, request):
-        # Wir prefetchen die Zwischentabelle (sortiert nach Position) 
-        # und holen direkt die A-Objekte samt ihren Sections mit.
-        prefetch_through = Prefetch(
-            'slideinsceneposition_set',
-            queryset=SlideInScenePosition.objects.select_related('slide')
-                .prefetch_related('slide__sections__parameter_sets__parameters')
+        scenes = Scene.objects.prefetch_related(get_slide_positions_prefetch())
+        return JsonResponse(
+            {"scenes": [serialize_scene(scene) for scene in scenes]},
+            safe=False,
         )
-        
-        scenes = Scene.objects.prefetch_related(prefetch_through).all()
-
-        scene_list = []
-        for scene in scenes:
-            # Tags splitten
-            raw_tags = scene.tags or ''
-            tag_list = [t.strip() for t in raw_tags.split(',') if t.strip()]
-        
-            slide_list = []
-            for line in scene.slideinsceneposition_set.all():
-                slide = line.slide  # Das eigentliche A-Objekt
-            
-                # Sections vom verknüpften A-Objekt holen
-                section_list = [serialize_section(s) for s in slide.sections.all()]
-            
-                slide_list.append({
-                    "id": slide.id,
-                    "name": slide.name,
-                    "created_at": slide.created_at,
-                    "updated_at": slide.updated_at,
-                    "width": slide.width,
-                    "height": slide.height,
-                    "tags": slide.tag_list,  
-                    "sections": section_list,
-                    "position": line.position 
-                })
-
-            scene_list.append({
-                "id": scene.id,
-                "name": scene.name,
-                "description": scene.description,
-                "updated_at": scene.updated_at,
-                "created_at": scene.created_at,
-                "tags": tag_list,
-                "slides": slide_list  
-            })
-
-        return JsonResponse({"scenes": scene_list}, safe=False)
-
 
     def post(self, request, *args, **kwargs):
         try: 
@@ -384,35 +383,16 @@ class SceneView(View):
 
 @method_decorator(csrf_exempt, name='dispatch')    
 class SceneDetailView(View):
-            
+
     def get(self, request, scene_id):
         try:
-            scene = Scene.objects.prefetch_related('slides__sections__parameter_sets__parameters').get(id=scene_id)
+            scene = Scene.objects.prefetch_related(
+                get_slide_positions_prefetch()
+            ).get(id=scene_id)
         except Scene.DoesNotExist:
             return JsonResponse({'error': 'Scene not found', 'status': 'error'}, status=404)
-        
-        response_data = {
-            'id': scene.id,
-            'name': scene.name,
-            'created_at': scene.created_at,
-            'updated_at': scene.updated_at,
-            'tags': scene.tag_list,
-            'slides': [{
-                'id': slide.id,
-                'name': slide.name,
-                'created_at': slide.created_at,
-                'updated_at': slide.updated_at,
-                'width': slide.width,
-                'height': slide.height,
-                'tags': slide.tag_list,
-                'sections': [serialize_section(s) for s in slide.sections.all()],
-            } for slide in scene.slides.all()],
-            'slide_positions': [{
-                'id': sip.slide.id,
-                'position': sip.position
-            } for sip in scene.slideinsceneposition_set.all().order_by('position')]
-        }
-        return JsonResponse(response_data)
+
+        return JsonResponse(serialize_scene(scene))
 
     def patch(self, request, scene_id):
         return self._update(request, scene_id)
@@ -436,7 +416,7 @@ class SceneDetailView(View):
         scene.tags = ', '.join(data.get('tags', scene.tag_list))
         scene.updated_at = timezone.now()
         #slide_ids = data.get("slides", list(scene.slides.values_list('id', flat=True)))
-        slide_data_list = data.get("slide_positions", [])
+        slide_data_list = data.get("slides", [])
 
         SlideInScenePosition.objects.filter(scene=scene).delete()
         
@@ -586,7 +566,7 @@ class SlideView(View):
 
                 return JsonResponse({
                     'message': f'Slide "{slide.name}" created successfully.',
-                    'slide_id': slide.id,
+                    'id': slide.id,
                     'slide': {
                         'id': slide.id,
                         'name': slide.name,
