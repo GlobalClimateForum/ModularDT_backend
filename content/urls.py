@@ -27,8 +27,7 @@ urlpatterns = [
 
     # Live
     path('livepresentation/', views.LivePresentationView.as_view(), name='livepresentation'),
-    path('liveslides/', views.LiveSlidesView.as_view(), name='liveslides'),
-
+  
     # Parameters
     path('parameters/', views.ParameterSetView.as_view(), name='parameters'),
     path('parameters/<int:section_id>/', views.ParameterSetDetailView.as_view(), name='parameters-detail'),
