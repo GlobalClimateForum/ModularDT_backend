@@ -170,4 +170,21 @@ class ParameterStateConsumer(AsyncWebsocketConsumer):
             await self.send(text_data=json.dumps({"type": "snapshot", "data": snapshot}))
     
     
-    
+class HomeConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.individual_group = f'home'
+        await self.channel_layer.group_add(self.individual_group, self.channel_name)
+
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        # Aus beiden Gruppen sauber austragen
+        await self.channel_layer.group_discard(self.individual_group, self.channel_name)
+
+    async def send_home_message(self, event):
+        # Wir holen das 'payload'-Objekt aus dem Event
+        payload = event['payload']
+
+        # Und senden es als JSON direkt ans Vue-Frontend
+        await self.send(text_data=json.dumps(payload))
+            

@@ -159,7 +159,6 @@ class MonitorView(View):
         )
         return JsonResponse({"status": "success", "message": "Monitor updated"})
 
-
 @method_decorator(csrf_exempt, name='dispatch')
 class MonitorDetailView(View):
     
@@ -366,3 +365,23 @@ class ModeratorView(View):
             }
         )
         return JsonResponse({"status": "success", "message": "Moderator updated"})
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class HomeView(View): 
+
+    def patch(self, request):
+        data = json.loads(request.body)
+
+        channel_layer = get_channel_layer()
+        group_name = f'home'
+        data = json.loads(request.body)
+    
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                'type': 'send_home_message', 
+                'payload': data
+            }
+        )
+        return JsonResponse({"status": "success", "message": "Home updated"})

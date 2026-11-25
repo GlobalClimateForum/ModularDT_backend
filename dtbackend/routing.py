@@ -7,5 +7,6 @@ websocket_urlpatterns = [
     re_path(r'^ws/participant/(?P<participant_id>\d+)/$', consumers.ParticipantConsumer.as_asgi()),
     re_path(r"ws/parameters/$", consumers.ParameterConsumer.as_asgi()),
     re_path(r"ws/moderator/$", consumers.ModeratorConsumer.as_asgi()),
+    re_path(r"ws/home/$", consumers.HomeConsumer.as_asgi()),
     re_path(r"ws/parameter-state/$", consumers.ParameterStateConsumer.as_asgi()),
 ]

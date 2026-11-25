@@ -11,6 +11,7 @@ urlpatterns = [
     path("participants/<int:participant_id>/", views.ParticipantDetailView.as_view(), name="participant-detail"),
     path('settings/', views.SettingsView.as_view(), name='settings'),
     path('moderator/', views.ModeratorView.as_view(), name='moderator'),
+    path('home/', views.HomeView.as_view(), name='home'),
     path('events/', views.EventView.as_view(), name='events'),
     path('events/<int:event_id>/', views.EventDetailView.as_view(), name='event-detail'),
     path('authorize/<str:pin>/', views.Authorize.as_view(), name='authorize'),
